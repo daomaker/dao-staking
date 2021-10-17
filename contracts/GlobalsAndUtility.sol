@@ -19,7 +19,7 @@ contract GlobalsAndUtility {
         address indexed stakerAddr,
         uint40 indexed stakeId,
         uint40 timestamp,
-        uint72 stakedHearts,
+        uint72 stakedAmount,
         uint72 stakeShares,
         uint16 stakedDays
     );
@@ -29,7 +29,7 @@ contract GlobalsAndUtility {
         uint40 indexed stakeId,
         address indexed senderAddr,
         uint40 timestamp,
-        uint72 stakedHearts,
+        uint72 stakedAmount,
         uint72 stakeShares,
         uint72 payout,
         uint72 penalty
@@ -39,7 +39,7 @@ contract GlobalsAndUtility {
         address indexed stakerAddr,
         uint40 indexed stakeId,
         uint40 timestamp,
-        uint72 stakedHearts,
+        uint72 stakedAmount,
         uint72 stakeShares,
         uint72 payout,
         uint72 penalty,
@@ -66,17 +66,16 @@ contract GlobalsAndUtility {
     uint256 internal constant LATE_PENALTY_GRACE_DAYS = 14;
     uint256 internal constant LATE_PENALTY_SCALE_DAYS = 700;
 
-    /* Stake shares Longer Pays Better bonus constants used by _stakeStartBonusHearts() */
+    /* Stake shares Longer Pays Better bonus constants used by _stakeStartBonusShares() */
     uint256 private constant LPB_BONUS_PERCENT = 20;
     uint256 private constant LPB_BONUS_MAX_PERCENT = 200;
     uint256 internal constant LPB = 364 * 100 / LPB_BONUS_PERCENT;
     uint256 internal constant LPB_MAX_DAYS = LPB * LPB_BONUS_MAX_PERCENT / 100;
 
-    /* Stake shares Bigger Pays Better bonus constants used by _stakeStartBonusHearts() */
+    /* Stake shares Bigger Pays Better bonus constants used by _stakeStartBonusShares() */
     uint256 private constant BPB_BONUS_PERCENT = 10;
-    uint256 private constant BPB_MAX_HEX = 150 * 1e6; //150M
-    uint256 internal constant BPB_MAX_HEARTS = BPB_MAX_HEX * 1e18;
-    uint256 internal constant BPB = BPB_MAX_HEARTS * 100 / BPB_BONUS_PERCENT;
+    uint256 internal constant BPB_MAX = 150 * 1e6 * 1e18; //150M * token decimals 
+    uint256 internal constant BPB = BPB_MAX * 100 / BPB_BONUS_PERCENT;
 
     /* Share rate is scaled to increase precision */
     uint256 internal constant SHARE_RATE_SCALE = 1e5;
@@ -88,7 +87,7 @@ contract GlobalsAndUtility {
     /* Globals expanded for memory (except _latestStakeId) and compact for storage */
     struct GlobalsCache {
         // 1
-        uint256 _lockedHeartsTotal;
+        uint256 _lockedStakeTotal;
         uint256 _nextStakeSharesTotal;
         uint256 _shareRate;
         uint256 _stakePenaltyTotal;
@@ -102,7 +101,7 @@ contract GlobalsAndUtility {
 
     struct GlobalsStore {
         // 1
-        uint72 lockedHeartsTotal;
+        uint72 lockedStakeTotal;
         uint72 nextStakeSharesTotal;
         uint40 shareRate;
         uint72 stakePenaltyTotal;
@@ -125,7 +124,7 @@ contract GlobalsAndUtility {
     /* Stake expanded for memory (except _stakeId) and compact for storage */
     struct StakeCache {
         uint40 _stakeId;
-        uint256 _stakedHearts;
+        uint256 _stakedAmount;
         uint256 _stakeShares;
         uint256 _lockedDay;
         uint256 _stakedDays;
@@ -134,7 +133,7 @@ contract GlobalsAndUtility {
 
     struct StakeStore {
         uint40 stakeId;
-        uint72 stakedHearts;
+        uint72 stakedAmount;
         uint72 stakeShares;
         uint16 lockedDay;
         uint16 stakedDays;
@@ -162,7 +161,7 @@ contract GlobalsAndUtility {
         _globalsLoad(g, gSnapshot);
 
         if (beforeDay != 0) {
-            require(beforeDay <= g._currentDay, "HEX: beforeDay cannot be in the future");
+            require(beforeDay <= g._currentDay, "STAKING: beforeDay cannot be in the future");
 
             _dailyDataUpdate(g, beforeDay, false);
         } else {
@@ -185,7 +184,7 @@ contract GlobalsAndUtility {
         view
         returns (uint256[] memory listDayStakeSharesTotal, uint256[] memory listDayPayoutTotal)
     {
-        require(beginDay < endDay && endDay <= globals.dailyDataCount, "HEX: range invalid");
+        require(beginDay < endDay && endDay <= globals.dailyDataCount, "STAKING: range invalid");
 
         listDayStakeSharesTotal = new uint256[](endDay - beginDay);
         listDayPayoutTotal = new uint256[](endDay - beginDay);
@@ -200,23 +199,18 @@ contract GlobalsAndUtility {
 
     /**
      * @dev PUBLIC FACING: External helper to return most global info with a single call.
-     * Ugly implementation due to limitations of the standard ABI encoder.
-     * @return Fixed array of values
+     * @return global variables
      */
     function globalInfo()
         external
         view
-        returns (uint256[7] memory)
+        returns (GlobalsCache memory)
     {
-        /*return [ TODO
-            globals.lockedHeartsTotal,
-            globals.nextStakeSharesTotal,
-            globals.shareRate,
-            globals.stakePenaltyTotal,
-            globals.dailyDataCount,
-            globals.stakeSharesTotal,
-            globals.latestStakeId
-        ];*/
+        GlobalsCache memory g;
+        GlobalsCache memory gSnapshot;
+        _globalsLoad(g, gSnapshot);
+
+        return g;
     }
 
     /**
@@ -250,7 +244,7 @@ contract GlobalsAndUtility {
         view
     {
         // 1
-        g._lockedHeartsTotal = globals.lockedHeartsTotal;
+        g._lockedStakeTotal = globals.lockedStakeTotal;
         g._nextStakeSharesTotal = globals.nextStakeSharesTotal;
         g._shareRate = globals.shareRate;
         g._stakePenaltyTotal = globals.stakePenaltyTotal;
@@ -269,7 +263,7 @@ contract GlobalsAndUtility {
         pure
     {
         // 1
-        gSnapshot._lockedHeartsTotal = g._lockedHeartsTotal;
+        gSnapshot._lockedStakeTotal = g._lockedStakeTotal;
         gSnapshot._nextStakeSharesTotal = g._nextStakeSharesTotal;
         gSnapshot._shareRate = g._shareRate;
         gSnapshot._stakePenaltyTotal = g._stakePenaltyTotal;
@@ -282,12 +276,12 @@ contract GlobalsAndUtility {
     function _globalsSync(GlobalsCache memory g, GlobalsCache memory gSnapshot)
         internal
     {
-        if (g._lockedHeartsTotal != gSnapshot._lockedHeartsTotal
+        if (g._lockedStakeTotal != gSnapshot._lockedStakeTotal
             || g._nextStakeSharesTotal != gSnapshot._nextStakeSharesTotal
             || g._shareRate != gSnapshot._shareRate
             || g._stakePenaltyTotal != gSnapshot._stakePenaltyTotal) {
             // 1
-            globals.lockedHeartsTotal = uint72(g._lockedHeartsTotal);
+            globals.lockedStakeTotal = uint72(g._lockedStakeTotal);
             globals.nextStakeSharesTotal = uint72(g._nextStakeSharesTotal);
             globals.shareRate = uint40(g._shareRate);
             globals.stakePenaltyTotal = uint72(g._stakePenaltyTotal);
@@ -307,10 +301,10 @@ contract GlobalsAndUtility {
         view
     {
         /* Ensure caller's stakeIndex is still current */
-        require(stakeIdParam == stRef.stakeId, "HEX: stakeIdParam not in stake");
+        require(stakeIdParam == stRef.stakeId, "STAKING: stakeIdParam not in stake");
 
         st._stakeId = stRef.stakeId;
-        st._stakedHearts = stRef.stakedHearts;
+        st._stakedAmount = stRef.stakedAmount;
         st._stakeShares = stRef.stakeShares;
         st._lockedDay = stRef.lockedDay;
         st._stakedDays = stRef.stakedDays;
@@ -321,7 +315,7 @@ contract GlobalsAndUtility {
         internal
     {
         stRef.stakeId = st._stakeId;
-        stRef.stakedHearts = uint72(st._stakedHearts);
+        stRef.stakedAmount = uint72(st._stakedAmount);
         stRef.stakeShares = uint72(st._stakeShares);
         stRef.lockedDay = uint16(st._lockedDay);
         stRef.stakedDays = uint16(st._stakedDays);
@@ -331,7 +325,7 @@ contract GlobalsAndUtility {
     function _stakeAdd(
         StakeStore[] storage stakeListRef,
         uint40 newStakeId,
-        uint256 newStakedHearts,
+        uint256 newstakedAmount,
         uint256 newStakeShares,
         uint256 newLockedDay,
         uint256 newStakedDays
@@ -341,7 +335,7 @@ contract GlobalsAndUtility {
         stakeListRef.push(
             StakeStore(
                 newStakeId,
-                uint72(newStakedHearts),
+                uint72(newstakedAmount),
                 uint72(newStakeShares),
                 uint16(newLockedDay),
                 uint16(newStakedDays),
@@ -381,7 +375,7 @@ contract GlobalsAndUtility {
      * @param g Cache of stored globals
      * @param stakeSharesParam Param from stake to calculate bonuses for
      * @param day Day to calculate bonuses for
-     * @return payout Payout in Hearts
+     * @return payout
      */
     function _estimatePayoutRewardsDay(GlobalsCache memory g, uint256 stakeSharesParam, uint256 day)
         internal

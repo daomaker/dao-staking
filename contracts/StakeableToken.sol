@@ -17,10 +17,10 @@ contract StakeableToken is GlobalsAndUtility {
 
     /**
      * @dev PUBLIC FACING: Open a stake.
-     * @param newStakedHearts Number of Hearts to stake
+     * @param newStakedAmount Amount of staking token to stake
      * @param newStakedDays Number of days to stake
      */
-    function stakeStart(uint256 newStakedHearts, uint256 newStakedDays)
+    function stakeStart(uint256 newStakedAmount, uint256 newStakedDays)
         external
     {
         GlobalsCache memory g;
@@ -28,15 +28,15 @@ contract StakeableToken is GlobalsAndUtility {
         _globalsLoad(g, gSnapshot);
 
         /* Enforce the minimum stake time */
-        require(newStakedDays >= MIN_STAKE_DAYS, "HEX: newStakedDays lower than minimum");
+        require(newStakedDays >= MIN_STAKE_DAYS, "STAKING: newStakedDays lower than minimum");
 
         /* Check if log data needs to be updated */
         _dailyDataUpdateAuto(g);
 
-        _stakeStart(g, newStakedHearts, newStakedDays);
+        _stakeStart(g, newStakedAmount, newStakedDays);
 
-        /* Remove staked Hearts from balance of staker */
-        stakingToken.safeTransferFrom(msg.sender, address(this), newStakedHearts);
+        /* Remove staked amount from balance of staker */
+        stakingToken.safeTransferFrom(msg.sender, address(this), newStakedAmount);
 
         _globalsSync(g, gSnapshot);
     }
@@ -56,8 +56,8 @@ contract StakeableToken is GlobalsAndUtility {
         _globalsLoad(g, gSnapshot);
 
         /* require() is more informative than the default assert() */
-        require(stakeLists[stakerAddr].length != 0, "HEX: Empty stake list");
-        require(stakeIndex < stakeLists[stakerAddr].length, "HEX: stakeIndex invalid");
+        require(stakeLists[stakerAddr].length != 0, "STAKING: Empty stake list");
+        require(stakeIndex < stakeLists[stakerAddr].length, "STAKING: stakeIndex invalid");
 
         StakeStore storage stRef = stakeLists[stakerAddr][stakeIndex];
 
@@ -66,10 +66,10 @@ contract StakeableToken is GlobalsAndUtility {
         _stakeLoad(stRef, stakeIdParam, st);
 
         /* Stake must have served full term */
-        require(g._currentDay >= st._lockedDay + st._stakedDays, "HEX: Stake not fully served");
+        require(g._currentDay >= st._lockedDay + st._stakedDays, "STAKING: Stake not fully served");
 
         /* Stake must still be locked */
-        require(st._unlockedDay == 0, "HEX: Stake already unlocked");
+        require(st._unlockedDay == 0, "STAKING: Stake already unlocked");
 
         /* Check if log data needs to be updated */
         _dailyDataUpdateAuto(g);
@@ -87,7 +87,7 @@ contract StakeableToken is GlobalsAndUtility {
         _emitStakeGoodAccounting(
             stakerAddr,
             stakeIdParam,
-            st._stakedHearts,
+            st._stakedAmount,
             st._stakeShares,
             payout,
             penalty
@@ -119,8 +119,8 @@ contract StakeableToken is GlobalsAndUtility {
         StakeStore[] storage stakeListRef = stakeLists[msg.sender];
 
         /* require() is more informative than the default assert() */
-        require(stakeListRef.length != 0, "HEX: Empty stake list");
-        require(stakeIndex < stakeListRef.length, "HEX: stakeIndex invalid");
+        require(stakeListRef.length != 0, "STAKING: Empty stake list");
+        require(stakeIndex < stakeListRef.length, "STAKING: stakeIndex invalid");
 
         /* Get stake copy */
         StakeCache memory st;
@@ -155,12 +155,12 @@ contract StakeableToken is GlobalsAndUtility {
             /* Stake hasn't been added to the total yet, so no penalties or rewards apply */
             g._nextStakeSharesTotal -= st._stakeShares;
 
-            stakeReturn = st._stakedHearts;
+            stakeReturn = st._stakedAmount;
         }
 
         _emitStakeEnd(
             stakeIdParam,
-            st._stakedHearts,
+            st._stakedAmount,
             st._stakeShares,
             payout,
             penalty,
@@ -180,7 +180,7 @@ contract StakeableToken is GlobalsAndUtility {
             /* Update the share rate if necessary */
             _shareRateUpdate(g, st, stakeReturn);
         }
-        g._lockedHeartsTotal -= st._stakedHearts;
+        g._lockedStakeTotal -= st._stakedAmount;
 
         _stakeRemove(stakeListRef, stakeIndex);
 
@@ -202,24 +202,24 @@ contract StakeableToken is GlobalsAndUtility {
     /**
      * @dev Open a stake.
      * @param g Cache of stored globals
-     * @param newStakedHearts Number of Hearts to stake
+     * @param newStakedAmount Amount of staking token to stake
      * @param newStakedDays Number of days to stake
      */
     function _stakeStart(
         GlobalsCache memory g,
-        uint256 newStakedHearts,
+        uint256 newStakedAmount,
         uint256 newStakedDays
     )
         internal
     {
         /* Enforce the maximum stake time */
-        require(newStakedDays <= MAX_STAKE_DAYS, "HEX: newStakedDays higher than maximum");
+        require(newStakedDays <= MAX_STAKE_DAYS, "STAKING: newStakedDays higher than maximum");
 
-        uint256 bonusHearts = _stakeStartBonusHearts(newStakedHearts, newStakedDays);
-        uint256 newStakeShares = (newStakedHearts + bonusHearts) * SHARE_RATE_SCALE / g._shareRate;
+        uint256 bonusShares = _stakeStartBonusShares(newStakedAmount, newStakedDays);
+        uint256 newStakeShares = (newStakedAmount + bonusShares) * SHARE_RATE_SCALE / g._shareRate;
 
-        /* Ensure newStakedHearts is enough for at least one stake share */
-        require(newStakeShares != 0, "HEX: newStakedHearts must be at least minimum shareRate");
+        /* Ensure newStakedAmount is enough for at least one stake share */
+        require(newStakeShares != 0, "STAKING: newStakedAmount must be at least minimum shareRate");
 
         /*
             The stakeStart timestamp will always be part-way through the current
@@ -234,19 +234,19 @@ contract StakeableToken is GlobalsAndUtility {
         _stakeAdd(
             stakeLists[msg.sender],
             newStakeId,
-            newStakedHearts,
+            newStakedAmount,
             newStakeShares,
             newLockedDay,
             newStakedDays
         );
 
-        _emitStakeStart(newStakeId, newStakedHearts, newStakeShares, newStakedDays);
+        _emitStakeStart(newStakeId, newStakedAmount, newStakeShares, newStakedDays);
 
         /* Stake is added to total in the next round, not the current round */
         g._nextStakeSharesTotal += newStakeShares;
 
-        /* Track total staked Hearts for inflation calculations */
-        g._lockedHeartsTotal += newStakedHearts;
+        /* Track total staked amount for inflation calculations */
+        g._lockedStakeTotal += newStakedAmount;
     }
 
     /**
@@ -255,7 +255,7 @@ contract StakeableToken is GlobalsAndUtility {
      * @param stakeSharesParam Param from stake to calculate bonuses for
      * @param beginDay First day to calculate bonuses for
      * @param endDay Last day (non-inclusive) of range to calculate bonuses for
-     * @return payout Payout in Hearts
+     * @return payout
      */
     function _calcPayoutRewards(
         GlobalsCache memory g,
@@ -276,14 +276,14 @@ contract StakeableToken is GlobalsAndUtility {
     }
 
     /**
-     * @dev Calculate bonus Hearts for a new stake, if any
-     * @param newStakedHearts Number of Hearts to stake
+     * @dev Calculate bonus shares for a new stake, if any
+     * @param newStakedAmount Amount of staking token
      * @param newStakedDays Number of days to stake
      */
-    function _stakeStartBonusHearts(uint256 newStakedHearts, uint256 newStakedDays)
+    function _stakeStartBonusShares(uint256 newStakedAmount, uint256 newStakedDays)
         private
         pure
-        returns (uint256 bonusHearts)
+        returns (uint256 bonusShares)
     {
         /*
             LONGER PAYS BETTER:
@@ -308,31 +308,31 @@ contract StakeableToken is GlobalsAndUtility {
 
             BIGGER PAYS BETTER:
 
-            Bonus percentage scaled 0% to 10% for the first 150M HEX of stake.
+            Bonus percentage scaled 0% to 10% for the first 150M of stake.
 
-            biggerBonus%    = (cappedHearts /  BPB_MAX_HEARTS) * 10%
-                            = (cappedHearts /  BPB_MAX_HEARTS) / 10
-                            =  cappedHearts / (BPB_MAX_HEARTS * 10)
-                            =  cappedHearts /  BPB
+            biggerBonus%    = (cappedStake /  BPB_MAX) * 10%
+                            = (cappedStake /  BPB_MAX) / 10
+                            =  cappedStake / (BPB_MAX * 10)
+                            =  cappedStake /  BPB
 
             COMBINED:
 
             combinedBonus%  =            longerBonus%  +  biggerBonus%
 
-                                      cappedExtraDays     cappedHearts
+                                      cappedExtraDays     cappedStake
                             =         ---------------  +  ------------
                                             LPB               BPB
 
-                                cappedExtraDays * BPB     cappedHearts * LPB
+                                cappedExtraDays * BPB     cappedStake * LPB
                             =   ---------------------  +  ------------------
                                       LPB * BPB               LPB * BPB
 
-                                cappedExtraDays * BPB  +  cappedHearts * LPB
+                                cappedExtraDays * BPB  +  cappedStake * LPB
                             =   --------------------------------------------
                                                   LPB  *  BPB
 
-            bonusHearts     = hearts * combinedBonus%
-                            = hearts * (cappedExtraDays * BPB  +  cappedHearts * LPB) / (LPB * BPB)
+            bonusShares     = stake * combinedBonus%
+                            = stake * (cappedExtraDays * BPB  +  cappedStake * LPB) / (LPB * BPB)
         */
         uint256 cappedExtraDays = 0;
 
@@ -341,14 +341,12 @@ contract StakeableToken is GlobalsAndUtility {
             cappedExtraDays = newStakedDays <= LPB_MAX_DAYS ? newStakedDays - 1 : LPB_MAX_DAYS;
         }
 
-        uint256 cappedStakedHearts = newStakedHearts <= BPB_MAX_HEARTS
-            ? newStakedHearts
-            : BPB_MAX_HEARTS;
+        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX ? newStakedAmount : BPB_MAX;
 
-        bonusHearts = cappedExtraDays * BPB + cappedStakedHearts * LPB;
-        bonusHearts = newStakedHearts * bonusHearts / (LPB * BPB);
+        bonusShares = cappedExtraDays * BPB + cappedStakedAmount * LPB;
+        bonusShares = newStakedAmount * bonusShares / (LPB * BPB);
 
-        return bonusHearts;
+        return bonusShares;
     }
 
     function _stakeUnlock(GlobalsCache memory g, StakeCache memory st)
@@ -372,7 +370,7 @@ contract StakeableToken is GlobalsAndUtility {
                 servedDays,
                 st._stakeShares
             );
-            stakeReturn = st._stakedHearts + payout;
+            stakeReturn = st._stakedAmount + payout;
         } else {
             // servedDays must == stakedDays here
             payout = _calcPayoutRewards(
@@ -381,7 +379,7 @@ contract StakeableToken is GlobalsAndUtility {
                 st._lockedDay,
                 st._lockedDay + servedDays
             );
-            stakeReturn = st._stakedHearts + payout;
+            stakeReturn = st._stakedAmount + payout;
 
             penalty = _calcLatePenalty(st._lockedDay, st._stakedDays, st._unlockedDay, stakeReturn);
         }
@@ -494,14 +492,14 @@ contract StakeableToken is GlobalsAndUtility {
     function _shareRateUpdate(GlobalsCache memory g, StakeCache memory st, uint256 stakeReturn)
         private
     {
-        if (stakeReturn > st._stakedHearts) {
+        if (stakeReturn > st._stakedAmount) {
             /*
                 Calculate the new shareRate that would yield the same number of shares if
                 the user re-staked this stakeReturn, factoring in any bonuses they would
                 receive in stakeStart().
             */
-            uint256 bonusHearts = _stakeStartBonusHearts(stakeReturn, st._stakedDays);
-            uint256 newShareRate = (stakeReturn + bonusHearts) * SHARE_RATE_SCALE / st._stakeShares;
+            uint256 bonusShares = _stakeStartBonusShares(stakeReturn, st._stakedDays);
+            uint256 newShareRate = (stakeReturn + bonusShares) * SHARE_RATE_SCALE / st._stakeShares;
 
             if (newShareRate > SHARE_RATE_MAX) {
                 /*
@@ -522,7 +520,7 @@ contract StakeableToken is GlobalsAndUtility {
 
     function _emitStakeStart(
         uint40 stakeId,
-        uint256 stakedHearts,
+        uint256 stakedAmount,
         uint256 stakeShares,
         uint256 stakedDays
     )
@@ -532,7 +530,7 @@ contract StakeableToken is GlobalsAndUtility {
             msg.sender,
             stakeId,
             uint40(block.timestamp),
-            uint72(stakedHearts),
+            uint72(stakedAmount),
             uint72(stakeShares),
             uint16(stakedDays)
         );
@@ -541,7 +539,7 @@ contract StakeableToken is GlobalsAndUtility {
     function _emitStakeGoodAccounting(
         address stakerAddr,
         uint40 stakeId,
-        uint256 stakedHearts,
+        uint256 stakedAmount,
         uint256 stakeShares,
         uint256 payout,
         uint256 penalty
@@ -553,7 +551,7 @@ contract StakeableToken is GlobalsAndUtility {
             stakeId,
             msg.sender,
             uint40(block.timestamp),
-            uint72(stakedHearts),
+            uint72(stakedAmount),
             uint72(stakeShares),
             uint72(payout),
             uint72(penalty)
@@ -562,7 +560,7 @@ contract StakeableToken is GlobalsAndUtility {
 
     function _emitStakeEnd(
         uint40 stakeId,
-        uint256 stakedHearts,
+        uint256 stakedAmount,
         uint256 stakeShares,
         uint256 payout,
         uint256 penalty,
@@ -575,7 +573,7 @@ contract StakeableToken is GlobalsAndUtility {
             msg.sender,
             stakeId,
             uint40(block.timestamp),
-            uint72(stakedHearts),
+            uint72(stakedAmount),
             uint72(stakeShares),
             uint72(payout),
             uint72(penalty),
