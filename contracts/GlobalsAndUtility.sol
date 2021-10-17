@@ -2,119 +2,69 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract GlobalsAndUtility {
+    IERC20 stakingToken;
 
-    /*  DailyDataUpdate   (auto-generated event)
-
-        uint40            timestamp       -->  data0 [ 39:  0]
-        uint16            beginDay        -->  data0 [ 55: 40]
-        uint16            endDay          -->  data0 [ 71: 56]
-        bool              isAutoUpdate    -->  data0 [ 79: 72]
-        address  indexed  updaterAddr
-    */
     event DailyDataUpdate(
-        uint256 data0,
-        address indexed updaterAddr
+        address indexed updaterAddr,
+        uint40 timestamp,
+        uint16 beginDay,
+        uint16 endDay,
+        bool isAutoUpdate
     );
 
-    /*  StakeStart        (auto-generated event)
-
-        uint40            timestamp       -->  data0 [ 39:  0]
-        address  indexed  stakerAddr
-        uint40   indexed  stakeId
-        uint72            stakedHearts    -->  data0 [111: 40]
-        uint72            stakeShares     -->  data0 [183:112]
-        uint16            stakedDays      -->  data0 [199:184]
-    */
     event StakeStart(
-        uint256 data0,
-        address indexed stakerAddr,
-        uint40 indexed stakeId
-    );
-
-    /*  StakeGoodAccounting(auto-generated event)
-
-        uint40            timestamp       -->  data0 [ 39:  0]
-        address  indexed  stakerAddr
-        uint40   indexed  stakeId
-        uint72            stakedHearts    -->  data0 [111: 40]
-        uint72            stakeShares     -->  data0 [183:112]
-        uint72            payout          -->  data0 [255:184]
-        uint72            penalty         -->  data1 [ 71:  0]
-        address  indexed  senderAddr
-    */
-    event StakeGoodAccounting(
-        uint256 data0,
-        uint256 data1,
         address indexed stakerAddr,
         uint40 indexed stakeId,
-        address indexed senderAddr
+        uint40 timestamp,
+        uint72 stakedHearts,
+        uint72 stakeShares,
+        uint16 stakedDays
     );
 
-    /*  StakeEnd          (auto-generated event)
-
-        uint40            timestamp       -->  data0 [ 39:  0]
-        address  indexed  stakerAddr
-        uint40   indexed  stakeId
-        uint72            stakedHearts    -->  data0 [111: 40]
-        uint72            stakeShares     -->  data0 [183:112]
-        uint72            payout          -->  data0 [255:184]
-        uint72            penalty         -->  data1 [ 71:  0]
-        uint16            servedDays      -->  data1 [ 87: 72]
-        bool              prevUnlocked    -->  data1 [ 95: 88]
-    */
-    event StakeEnd(
-        uint256 data0,
-        uint256 data1,
+    event StakeGoodAccounting(        
         address indexed stakerAddr,
-        uint40 indexed stakeId
+        uint40 indexed stakeId,
+        address indexed senderAddr,
+        uint40 timestamp,
+        uint72 stakedHearts,
+        uint72 stakeShares,
+        uint72 payout,
+        uint72 penalty
     );
 
-    /*  ShareRateChange   (auto-generated event)
+    event StakeEnd(
+        address indexed stakerAddr,
+        uint40 indexed stakeId,
+        uint40 timestamp,
+        uint72 stakedHearts,
+        uint72 stakeShares,
+        uint72 payout,
+        uint72 penalty,
+        uint16 servedDays,
+        bool prevUnlocked
+    );
 
-        uint40            timestamp       -->  data0 [ 39:  0]
-        uint40            shareRate       -->  data0 [ 79: 40]
-        uint40   indexed  stakeId
-    */
     event ShareRateChange(
-        uint256 data0,
-        uint40 indexed stakeId
+        uint40 indexed stakeId,
+        uint40 timestamp,
+        uint40 shareRate
     );
 
     /* Origin address */
     address internal constant ORIGIN_ADDR = 0x9A6a414D6F3497c05E3b1De90520765fA1E07c03;
 
-    /* ERC20 constants */
-    string public constant name = "HEX";
-    string public constant symbol = "HEX";
-    uint8 public constant decimals = 8;
-
-    /* Hearts per Satoshi = 10,000 * 1e8 / 1e8 = 1e4 */
-    uint256 private constant HEARTS_PER_HEX = 10 ** uint256(decimals); // 1e8
-    uint256 private constant HEX_PER_BTC = 1e4;
-    uint256 private constant SATOSHIS_PER_BTC = 1e8;
-    uint256 internal constant HEARTS_PER_SATOSHI = HEARTS_PER_HEX / SATOSHIS_PER_BTC * HEX_PER_BTC;
-
     /* Time of contract launch (2019-12-03T00:00:00Z) */
     uint256 internal constant LAUNCH_TIME = 1575331200;
 
-    /* Size of a Hearts or Shares uint */
-    uint256 internal constant HEART_UINT_SIZE = 72;
-
     /* Stake timing parameters */
     uint256 internal constant MIN_STAKE_DAYS = 1;
-    uint256 internal constant MIN_AUTO_STAKE_DAYS = 350;
-
     uint256 internal constant MAX_STAKE_DAYS = 5555; // Approx 15 years
-
     uint256 internal constant EARLY_PENALTY_MIN_DAYS = 90;
-
-    uint256 private constant LATE_PENALTY_GRACE_WEEKS = 2;
-    uint256 internal constant LATE_PENALTY_GRACE_DAYS = LATE_PENALTY_GRACE_WEEKS * 7;
-
-    uint256 private constant LATE_PENALTY_SCALE_WEEKS = 100;
-    uint256 internal constant LATE_PENALTY_SCALE_DAYS = LATE_PENALTY_SCALE_WEEKS * 7;
+    uint256 internal constant LATE_PENALTY_GRACE_DAYS = 14;
+    uint256 internal constant LATE_PENALTY_SCALE_DAYS = 700;
 
     /* Stake shares Longer Pays Better bonus constants used by _stakeStartBonusHearts() */
     uint256 private constant LPB_BONUS_PERCENT = 20;
@@ -124,8 +74,8 @@ contract GlobalsAndUtility {
 
     /* Stake shares Bigger Pays Better bonus constants used by _stakeStartBonusHearts() */
     uint256 private constant BPB_BONUS_PERCENT = 10;
-    uint256 private constant BPB_MAX_HEX = 150 * 1e6;
-    uint256 internal constant BPB_MAX_HEARTS = BPB_MAX_HEX * HEARTS_PER_HEX;
+    uint256 private constant BPB_MAX_HEX = 150 * 1e6; //150M
+    uint256 internal constant BPB_MAX_HEARTS = BPB_MAX_HEX * 1e18;
     uint256 internal constant BPB = BPB_MAX_HEARTS * 100 / BPB_BONUS_PERCENT;
 
     /* Share rate is scaled to increase precision */
@@ -228,28 +178,24 @@ contract GlobalsAndUtility {
      * a single call. Ugly implementation due to limitations of the standard ABI encoder.
      * @param beginDay First day of data range
      * @param endDay Last day (non-inclusive) of data range
-     * @return list Fixed array of packed values
+     * @return listDayStakeSharesTotal and listDayPayoutTotal
      */
     function dailyDataRange(uint256 beginDay, uint256 endDay)
         external
         view
-        returns (uint256[] memory list)
+        returns (uint256[] memory listDayStakeSharesTotal, uint256[] memory listDayPayoutTotal)
     {
         require(beginDay < endDay && endDay <= globals.dailyDataCount, "HEX: range invalid");
 
-        list = new uint256[](endDay - beginDay);
+        listDayStakeSharesTotal = new uint256[](endDay - beginDay);
+        listDayPayoutTotal = new uint256[](endDay - beginDay);
 
         uint256 src = beginDay;
         uint256 dst = 0;
-        uint256 v;
         do {
-            v = uint256(dailyData[src].dayStakeSharesTotal) << HEART_UINT_SIZE;
-            v |= uint256(dailyData[src].dayPayoutTotal);
-
-            list[dst++] = v;
+            listDayStakeSharesTotal[dst] = dailyData[src].dayStakeSharesTotal;
+            listDayPayoutTotal[dst++] = dailyData[src].dayPayoutTotal;
         } while (++src < endDay);
-
-        return list;
     }
 
     /**
@@ -260,39 +206,17 @@ contract GlobalsAndUtility {
     function globalInfo()
         external
         view
-        returns (uint256[9] memory)
+        returns (uint256[7] memory)
     {
-        return [
-            // 1
+        /*return [ TODO
             globals.lockedHeartsTotal,
             globals.nextStakeSharesTotal,
             globals.shareRate,
             globals.stakePenaltyTotal,
-            // 2
             globals.dailyDataCount,
             globals.stakeSharesTotal,
-            globals.latestStakeId,
-            //
-            block.timestamp,
-            totalSupply()
-        ];
-    }
-
-    function totalSupply() public view returns (uint) {
-        return 0;
-    }
-
-    /**
-     * @dev PUBLIC FACING: ERC20 totalSupply() is the circulating supply and does not include any
-     * staked Hearts. allocatedSupply() includes both.
-     * @return Allocated Supply in Hearts
-     */
-    function allocatedSupply()
-        external
-        view
-        returns (uint256)
-    {
-        return totalSupply() + globals.lockedHeartsTotal;
+            globals.latestStakeId
+        ];*/
     }
 
     /**
@@ -469,7 +393,6 @@ contract GlobalsAndUtility {
         _globalsCacheSnapshot(g, gTmp);
 
         DailyRoundState memory rs;
-        rs._allocSupplyCached = totalSupply() + g._lockedHeartsTotal;
 
         _dailyRoundCalc(gTmp, rs, day);
 
@@ -485,22 +408,7 @@ contract GlobalsAndUtility {
         private
         pure
     {
-        /*
-            Calculate payout round
-
-            Inflation of 3.69% inflation per 364 days             (approx 1 year)
-            dailyInterestRate   = exp(log(1 + 3.69%)  / 364) - 1
-                                = exp(log(1 + 0.0369) / 364) - 1
-                                = exp(log(1.0369) / 364) - 1
-                                = 0.000099553011616349            (approx)
-
-            payout  = allocSupply * dailyInterestRate
-                    = allocSupply / (1 / dailyInterestRate)
-                    = allocSupply / (1 / 0.000099553011616349)
-                    = allocSupply / 10044.899534066692            (approx)
-                    = allocSupply * 10000 / 100448995             (* 10000/10000 for int precision)
-        */
-        rs._payoutTotal = rs._allocSupplyCached * 10000 / 100448995;
+        rs._payoutTotal = 2111; // TODO
 
         if (g._stakePenaltyTotal != 0) {
             rs._payoutTotal += g._stakePenaltyTotal;
@@ -526,7 +434,6 @@ contract GlobalsAndUtility {
         }
 
         DailyRoundState memory rs;
-        rs._allocSupplyCached = totalSupply() + g._lockedHeartsTotal;
 
         uint256 day = g._dailyDataCount;
 
@@ -549,12 +456,12 @@ contract GlobalsAndUtility {
     function _emitDailyDataUpdate(uint256 beginDay, uint256 endDay, bool isAutoUpdate)
         private
     {
-        emit DailyDataUpdate( // (auto-generated event)
-            uint256(uint40(block.timestamp))
-                | (uint256(uint16(beginDay)) << 40)
-                | (uint256(uint16(endDay)) << 56)
-                | (isAutoUpdate ? (1 << 72) : 0),
-            msg.sender
+        emit DailyDataUpdate(
+            msg.sender,
+            uint40(block.timestamp),
+            uint16(beginDay),
+            uint16(endDay),
+            isAutoUpdate
         );
     }
 }

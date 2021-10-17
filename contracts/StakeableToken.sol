@@ -2,9 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GlobalsAndUtility.sol";
 
 contract StakeableToken is GlobalsAndUtility {
+    using SafeERC20 for IERC20;
+
     constructor()
         public
     {
@@ -33,7 +36,7 @@ contract StakeableToken is GlobalsAndUtility {
         _stakeStart(g, newStakedHearts, newStakedDays);
 
         /* Remove staked Hearts from balance of staker */
-        // TODO _burn(msg.sender, newStakedHearts);
+        stakingToken.safeTransferFrom(msg.sender, address(this), newStakedHearts);
 
         _globalsSync(g, gSnapshot);
     }
@@ -172,7 +175,7 @@ contract StakeableToken is GlobalsAndUtility {
 
         /* Pay the stake return, if any, to the staker */
         if (stakeReturn != 0) {
-            // TODO _mint(msg.sender, stakeReturn);
+            stakingToken.safeTransfer(msg.sender, stakeReturn);
 
             /* Update the share rate if necessary */
             _shareRateUpdate(g, st, stakeReturn);
@@ -480,7 +483,7 @@ contract StakeableToken is GlobalsAndUtility {
         uint256 splitPenalty = penalty / 2;
 
         if (splitPenalty != 0) {
-            // TODO _mint(ORIGIN_ADDR, splitPenalty);
+            stakingToken.safeTransfer(ORIGIN_ADDR, splitPenalty);
         }
 
         /* Use the other half of the penalty to account for an odd-numbered penalty */
@@ -525,13 +528,13 @@ contract StakeableToken is GlobalsAndUtility {
     )
         private
     {
-        emit StakeStart( // (auto-generated event)
-            uint256(uint40(block.timestamp))
-                | (uint256(uint72(stakedHearts)) << 40)
-                | (uint256(uint72(stakeShares)) << 112)
-                | (uint256(uint16(stakedDays)) << 184),
+        emit StakeStart(
             msg.sender,
-            stakeId
+            stakeId,
+            uint40(block.timestamp),
+            uint72(stakedHearts),
+            uint72(stakeShares),
+            uint16(stakedDays)
         );
     }
 
@@ -545,15 +548,15 @@ contract StakeableToken is GlobalsAndUtility {
     )
         private
     {
-        emit StakeGoodAccounting( // (auto-generated event)
-            uint256(uint40(block.timestamp))
-                | (uint256(uint72(stakedHearts)) << 40)
-                | (uint256(uint72(stakeShares)) << 112)
-                | (uint256(uint72(payout)) << 184),
-            uint256(uint72(penalty)),
+        emit StakeGoodAccounting(
             stakerAddr,
             stakeId,
-            msg.sender
+            msg.sender,
+            uint40(block.timestamp),
+            uint72(stakedHearts),
+            uint72(stakeShares),
+            uint72(payout),
+            uint72(penalty)
         );
     }
 
@@ -568,26 +571,26 @@ contract StakeableToken is GlobalsAndUtility {
     )
         private
     {
-        emit StakeEnd( // (auto-generated event)
-            uint256(uint40(block.timestamp))
-                | (uint256(uint72(stakedHearts)) << 40)
-                | (uint256(uint72(stakeShares)) << 112)
-                | (uint256(uint72(payout)) << 184),
-            uint256(uint72(penalty))
-                | (uint256(uint16(servedDays)) << 72)
-                | (prevUnlocked ? (1 << 88) : 0),
+        emit StakeEnd(
             msg.sender,
-            stakeId
+            stakeId,
+            uint40(block.timestamp),
+            uint72(stakedHearts),
+            uint72(stakeShares),
+            uint72(payout),
+            uint72(penalty),
+            uint16(servedDays),
+            prevUnlocked
         );
     }
 
     function _emitShareRateChange(uint256 shareRate, uint40 stakeId)
         private
     {
-        emit ShareRateChange( // (auto-generated event)
-            uint256(uint40(block.timestamp))
-                | (uint256(uint40(shareRate)) << 40),
-            stakeId
+        emit ShareRateChange(
+            stakeId,
+            uint40(block.timestamp),
+            uint40(shareRate)
         );
     }
 }
