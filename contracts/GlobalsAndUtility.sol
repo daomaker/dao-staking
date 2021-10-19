@@ -90,6 +90,7 @@ abstract contract GlobalsAndUtility {
         uint256 _stakePenaltyTotal;
         uint256 _stakeSharesTotal;
 
+        uint256 _remainingRewardAmount;
         uint40 _latestStakeId;
         uint256 _shareRate;
         uint256 _dailyDataCount;
@@ -104,6 +105,7 @@ abstract contract GlobalsAndUtility {
         uint128 stakePenaltyTotal;
         uint128 stakeSharesTotal;
 
+        uint128 remainingRewardAmount;
         uint40 latestStakeId;
         uint40 shareRate;
         uint16 dailyDataCount;
@@ -246,6 +248,7 @@ abstract contract GlobalsAndUtility {
         g._stakeSharesTotal = globals.stakeSharesTotal;
         g._stakePenaltyTotal = globals.stakePenaltyTotal;
 
+        g._remainingRewardAmount = globals.remainingRewardAmount;
         g._latestStakeId = globals.latestStakeId;
         g._shareRate = globals.shareRate;
         g._dailyDataCount = globals.dailyDataCount;
@@ -262,6 +265,7 @@ abstract contract GlobalsAndUtility {
         globals.stakeSharesTotal = uint128(g._stakeSharesTotal);
         globals.stakePenaltyTotal = uint128(g._stakePenaltyTotal);
 
+        globals.remainingRewardAmount = uint128(g._remainingRewardAmount);
         globals.latestStakeId = g._latestStakeId;
         globals.shareRate = uint40(g._shareRate);
         globals.dailyDataCount = uint16(g._dailyDataCount);
@@ -368,6 +372,13 @@ abstract contract GlobalsAndUtility {
         view
     {
         rs._payoutTotal = dailyData[day].dayPayoutTotal;
+
+        // if anybody sends the staking token directly to this SC, it's distributed to the stakers
+        uint256 excessiveBalance = stakingToken.balanceOf(address(this)) - g._lockedStakeTotal - g._remainingRewardAmount;
+        if (excessiveBalance > 0) {
+            rs._payoutTotal += excessiveBalance;
+            g._remainingRewardAmount += excessiveBalance;
+        }
 
         if (g._stakePenaltyTotal != 0) {
             rs._payoutTotal += g._stakePenaltyTotal;
