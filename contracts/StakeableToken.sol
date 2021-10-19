@@ -2,17 +2,25 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GlobalsAndUtility.sol";
 
 contract StakeableToken is GlobalsAndUtility {
     using SafeERC20 for IERC20;
 
-    constructor()
-        public
+    constructor(
+        IERC20 _stakingToken,
+        uint40 _launchTime,
+        address _originAddr
+    )
     {
         /* Initialize global shareRate to 1 */
         globals.shareRate = uint40(1 * SHARE_RATE_SCALE);
+
+        stakingToken = _stakingToken;
+        launchTime = _launchTime;
+        originAddr = _originAddr;
     }
 
     /**
@@ -24,8 +32,7 @@ contract StakeableToken is GlobalsAndUtility {
         external
     {
         GlobalsCache memory g;
-        GlobalsCache memory gSnapshot;
-        _globalsLoad(g, gSnapshot);
+        _globalsLoad(g);
 
         /* Enforce the minimum stake time */
         require(newStakedDays >= MIN_STAKE_DAYS, "STAKING: newStakedDays lower than minimum");
@@ -38,7 +45,7 @@ contract StakeableToken is GlobalsAndUtility {
         /* Remove staked amount from balance of staker */
         stakingToken.safeTransferFrom(msg.sender, address(this), newStakedAmount);
 
-        _globalsSync(g, gSnapshot);
+        _globalsSync(g);
     }
 
     /**
@@ -52,8 +59,7 @@ contract StakeableToken is GlobalsAndUtility {
         external
     {
         GlobalsCache memory g;
-        GlobalsCache memory gSnapshot;
-        _globalsLoad(g, gSnapshot);
+        _globalsLoad(g);
 
         /* require() is more informative than the default assert() */
         require(stakeLists[stakerAddr].length != 0, "STAKING: Empty stake list");
@@ -79,7 +85,6 @@ contract StakeableToken is GlobalsAndUtility {
 
         /* stakeReturn value is unused here */
         (, uint256 payout, uint256 penalty, uint256 cappedPenalty) = _stakePerformance(
-            g,
             st,
             st._stakedDays
         );
@@ -100,7 +105,7 @@ contract StakeableToken is GlobalsAndUtility {
         /* st._unlockedDay has changed */
         _stakeUpdate(stRef, st);
 
-        _globalsSync(g, gSnapshot);
+        _globalsSync(g);
     }
 
     /**
@@ -113,8 +118,7 @@ contract StakeableToken is GlobalsAndUtility {
         external
     {
         GlobalsCache memory g;
-        GlobalsCache memory gSnapshot;
-        _globalsLoad(g, gSnapshot);
+        _globalsLoad(g);
 
         StakeStore[] storage stakeListRef = stakeLists[msg.sender];
 
@@ -150,7 +154,7 @@ contract StakeableToken is GlobalsAndUtility {
                 }
             }
 
-            (stakeReturn, payout, penalty, cappedPenalty) = _stakePerformance(g, st, servedDays);
+            (stakeReturn, payout, penalty, cappedPenalty) = _stakePerformance(st, servedDays);
         } else {
             /* Stake hasn't been added to the total yet, so no penalties or rewards apply */
             g._nextStakeSharesTotal -= st._stakeShares;
@@ -184,7 +188,26 @@ contract StakeableToken is GlobalsAndUtility {
 
         _stakeRemove(stakeListRef, stakeIndex);
 
-        _globalsSync(g, gSnapshot);
+        _globalsSync(g);
+    }
+ 
+    function fundRewards(
+        uint128 amountPerDay,
+        uint16 daysCount,
+        uint16 shiftInDays
+    )
+        external
+    {
+        require(daysCount <= 365, "STAKING: too many days");
+
+        stakingToken.safeTransferFrom(msg.sender, address(this), amountPerDay * daysCount);
+
+        uint256 currentDay = _currentDay() + 1;
+        uint256 fromDay = currentDay + shiftInDays;
+
+        for (uint256 day = fromDay; day < fromDay + daysCount; day++) {
+            dailyData[day].dayPayoutTotal += amountPerDay;
+        }
     }
 
     /**
@@ -251,14 +274,12 @@ contract StakeableToken is GlobalsAndUtility {
 
     /**
      * @dev Calculates total stake payout including rewards for a multi-day range
-     * @param g Cache of stored globals
      * @param stakeSharesParam Param from stake to calculate bonuses for
      * @param beginDay First day to calculate bonuses for
      * @param endDay Last day (non-inclusive) of range to calculate bonuses for
      * @return payout
      */
     function _calcPayoutRewards(
-        GlobalsCache memory g,
         uint256 stakeSharesParam,
         uint256 beginDay,
         uint256 endDay
@@ -267,11 +288,8 @@ contract StakeableToken is GlobalsAndUtility {
         view
         returns (uint256 payout)
     {
-        for (uint256 day = beginDay; day < endDay; day++) {
-            payout += dailyData[day].dayPayoutTotal * stakeSharesParam
-                / dailyData[day].dayStakeSharesTotal;
-        }
-
+        uint256 accRewardPerShare = dailyData[endDay].accRewardPerShare - dailyData[beginDay].accRewardPerShare;
+        payout = stakeSharesParam * accRewardPerShare / ACC_REWARD_MULTIPLIER;
         return payout;
     }
 
@@ -282,7 +300,7 @@ contract StakeableToken is GlobalsAndUtility {
      */
     function _stakeStartBonusShares(uint256 newStakedAmount, uint256 newStakedDays)
         private
-        pure
+        view
         returns (uint256 bonusShares)
     {
         /*
@@ -341,10 +359,11 @@ contract StakeableToken is GlobalsAndUtility {
             cappedExtraDays = newStakedDays <= LPB_MAX_DAYS ? newStakedDays - 1 : LPB_MAX_DAYS;
         }
 
-        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX ? newStakedAmount : BPB_MAX;
+        uint256 stakingTokenDecimals = IERC20Metadata(address(stakingToken)).decimals();
+        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX * stakingTokenDecimals ? newStakedAmount : BPB_MAX * stakingTokenDecimals;
 
-        bonusShares = cappedExtraDays * BPB + cappedStakedAmount * LPB;
-        bonusShares = newStakedAmount * bonusShares / (LPB * BPB);
+        bonusShares = cappedExtraDays * BPB * stakingTokenDecimals + cappedStakedAmount * LPB;
+        bonusShares = newStakedAmount * bonusShares / (LPB * BPB * stakingTokenDecimals);
 
         return bonusShares;
     }
@@ -357,14 +376,13 @@ contract StakeableToken is GlobalsAndUtility {
         st._unlockedDay = g._currentDay;
     }
 
-    function _stakePerformance(GlobalsCache memory g, StakeCache memory st, uint256 servedDays)
+    function _stakePerformance(StakeCache memory st, uint256 servedDays)
         private
         view
         returns (uint256 stakeReturn, uint256 payout, uint256 penalty, uint256 cappedPenalty)
     {
         if (servedDays < st._stakedDays) {
             (payout, penalty) = _calcPayoutAndEarlyPenalty(
-                g,
                 st._lockedDay,
                 st._stakedDays,
                 servedDays,
@@ -374,7 +392,6 @@ contract StakeableToken is GlobalsAndUtility {
         } else {
             // servedDays must == stakedDays here
             payout = _calcPayoutRewards(
-                g,
                 st._stakeShares,
                 st._lockedDay,
                 st._lockedDay + servedDays
@@ -398,7 +415,6 @@ contract StakeableToken is GlobalsAndUtility {
     }
 
     function _calcPayoutAndEarlyPenalty(
-        GlobalsCache memory g,
         uint256 lockedDayParam,
         uint256 stakedDaysParam,
         uint256 servedDays,
@@ -418,7 +434,7 @@ contract StakeableToken is GlobalsAndUtility {
 
         if (servedDays == 0) {
             /* Fill penalty days with the estimated average payout */
-            uint256 expected = _estimatePayoutRewardsDay(g, stakeSharesParam, lockedDayParam);
+            uint256 expected = _estimatePayoutRewardsDay(stakeSharesParam, lockedDayParam);
             penalty = expected * penaltyDays;
             return (payout, penalty); // Actual payout was 0
         }
@@ -432,15 +448,15 @@ contract StakeableToken is GlobalsAndUtility {
                 payout:     [lockedDay  .......................  servedEndDay)
             */
             uint256 penaltyEndDay = lockedDayParam + penaltyDays;
-            penalty = _calcPayoutRewards(g, stakeSharesParam, lockedDayParam, penaltyEndDay);
+            penalty = _calcPayoutRewards(stakeSharesParam, lockedDayParam, penaltyEndDay);
 
-            uint256 delta = _calcPayoutRewards(g, stakeSharesParam, penaltyEndDay, servedEndDay);
+            uint256 delta = _calcPayoutRewards(stakeSharesParam, penaltyEndDay, servedEndDay);
             payout = penalty + delta;
             return (payout, penalty);
         }
 
         /* penaltyDays >= servedDays  */
-        payout = _calcPayoutRewards(g, stakeSharesParam, lockedDayParam, servedEndDay);
+        payout = _calcPayoutRewards(stakeSharesParam, lockedDayParam, servedEndDay);
 
         if (penaltyDays == servedDays) {
             penalty = payout;
@@ -481,7 +497,7 @@ contract StakeableToken is GlobalsAndUtility {
         uint256 splitPenalty = penalty / 2;
 
         if (splitPenalty != 0) {
-            stakingToken.safeTransfer(ORIGIN_ADDR, splitPenalty);
+            stakingToken.safeTransfer(originAddr, splitPenalty);
         }
 
         /* Use the other half of the penalty to account for an odd-numbered penalty */
@@ -530,8 +546,8 @@ contract StakeableToken is GlobalsAndUtility {
             msg.sender,
             stakeId,
             uint40(block.timestamp),
-            uint72(stakedAmount),
-            uint72(stakeShares),
+            uint128(stakedAmount),
+            uint128(stakeShares),
             uint16(stakedDays)
         );
     }
@@ -551,10 +567,10 @@ contract StakeableToken is GlobalsAndUtility {
             stakeId,
             msg.sender,
             uint40(block.timestamp),
-            uint72(stakedAmount),
-            uint72(stakeShares),
-            uint72(payout),
-            uint72(penalty)
+            uint128(stakedAmount),
+            uint128(stakeShares),
+            uint128(payout),
+            uint128(penalty)
         );
     }
 
@@ -573,10 +589,10 @@ contract StakeableToken is GlobalsAndUtility {
             msg.sender,
             stakeId,
             uint40(block.timestamp),
-            uint72(stakedAmount),
-            uint72(stakeShares),
-            uint72(payout),
-            uint72(penalty),
+            uint128(stakedAmount),
+            uint128(stakeShares),
+            uint128(payout),
+            uint128(penalty),
             uint16(servedDays),
             prevUnlocked
         );
