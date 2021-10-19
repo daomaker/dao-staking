@@ -183,7 +183,6 @@ contract Staking is GlobalsAndUtility {
         /* Pay the stake return, if any, to the staker */
         if (stakeReturn != 0) {
             stakingToken.safeTransfer(msg.sender, stakeReturn);
-            g._remainingRewardAmount -= stakeReturn;
 
             /* Update the share rate if necessary */
             _shareRateUpdate(g, st, stakeReturn);
@@ -210,17 +209,14 @@ contract Staking is GlobalsAndUtility {
     {
         require(daysCount <= 365, "STAKING: too many days");
 
-        uint128 totalReward = amountPerDay * daysCount;
-        stakingToken.safeTransferFrom(msg.sender, address(this), totalReward);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amountPerDay * daysCount);
 
-        uint256 nextDay = _currentDay() + 1;
-        uint256 fromDay = nextDay + shiftInDays;
+        uint256 currentDay = _currentDay() + 1;
+        uint256 fromDay = currentDay + shiftInDays;
 
         for (uint256 day = fromDay; day < fromDay + daysCount; day++) {
             dailyData[day].dayPayoutTotal += amountPerDay;
         }
-
-        globals.remainingRewardAmount += totalReward;
     }
 
     /**
@@ -518,7 +514,6 @@ contract Staking is GlobalsAndUtility {
 
         if (splitPenalty != 0) {
             stakingToken.safeTransfer(originAddr, splitPenalty);
-            g._remainingRewardAmount -= splitPenalty;
         }
 
         /* Use the other half of the penalty to account for an odd-numbered penalty */
