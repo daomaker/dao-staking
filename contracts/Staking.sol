@@ -115,9 +115,11 @@ contract Staking is GlobalsAndUtility {
      * a stake id is used to reject stale indexes.
      * @param stakeIndex Index of stake within stake list
      * @param stakeIdParam The stake's id
+     * @return stakeReturn payout penalty
      */
     function stakeEnd(uint256 stakeIndex, uint40 stakeIdParam)
         external
+        returns (uint256 stakeReturn, uint256 payout, uint256 penalty)
     {
         GlobalsCache memory g;
         _globalsLoad(g);
@@ -138,9 +140,6 @@ contract Staking is GlobalsAndUtility {
         uint256 servedDays = 0;
 
         bool prevUnlocked = (st._unlockedDay != 0);
-        uint256 stakeReturn;
-        uint256 payout = 0;
-        uint256 penalty = 0;
         uint256 cappedPenalty = 0;
 
         if (g._currentDay >= st._lockedDay) {
@@ -193,6 +192,12 @@ contract Staking is GlobalsAndUtility {
         _stakeRemove(stakeListRef, stakeIndex);
 
         _globalsSync(g);
+
+        return (
+            stakeReturn,
+            payout,
+            penalty
+        );
     }
  
     function fundRewards(
