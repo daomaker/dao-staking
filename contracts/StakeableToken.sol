@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GlobalsAndUtility.sol";
 
-contract StakeableToken is GlobalsAndUtility {
+contract Staking is GlobalsAndUtility {
     using SafeERC20 for IERC20;
 
     constructor(
@@ -89,13 +89,15 @@ contract StakeableToken is GlobalsAndUtility {
             st._stakedDays
         );
 
-        _emitStakeGoodAccounting(
+        emit StakeGoodAccounting(
             stakerAddr,
             stakeIdParam,
-            st._stakedAmount,
-            st._stakeShares,
-            payout,
-            penalty
+            msg.sender,
+            uint40(block.timestamp),
+            uint128(st._stakedAmount),
+            uint128(st._stakeShares),
+            uint128(payout),
+            uint128(penalty)
         );
 
         if (cappedPenalty != 0) {
@@ -162,13 +164,15 @@ contract StakeableToken is GlobalsAndUtility {
             stakeReturn = st._stakedAmount;
         }
 
-        _emitStakeEnd(
+        emit StakeEnd(
+            msg.sender,
             stakeIdParam,
-            st._stakedAmount,
-            st._stakeShares,
-            payout,
-            penalty,
-            servedDays,
+            uint40(block.timestamp),
+            uint128(st._stakedAmount),
+            uint128(st._stakeShares),
+            uint128(payout),
+            uint128(penalty),
+            uint16(servedDays),
             prevUnlocked
         );
 
@@ -263,7 +267,14 @@ contract StakeableToken is GlobalsAndUtility {
             newStakedDays
         );
 
-        _emitStakeStart(newStakeId, newStakedAmount, newStakeShares, newStakedDays);
+        emit StakeStart(
+            msg.sender,
+            newStakeId,
+            uint40(block.timestamp),
+            uint128(newStakedAmount),
+            uint128(newStakeShares),
+            uint16(newStakedDays)
+        );
 
         /* Stake is added to total in the next round, not the current round */
         g._nextStakeSharesTotal += newStakeShares;
@@ -529,82 +540,12 @@ contract StakeableToken is GlobalsAndUtility {
             if (newShareRate > g._shareRate) {
                 g._shareRate = newShareRate;
 
-                _emitShareRateChange(newShareRate, st._stakeId);
+                emit ShareRateChange(
+                    st._stakeId,
+                    uint40(block.timestamp),
+                    uint40(newShareRate)
+                );
             }
         }
-    }
-
-    function _emitStakeStart(
-        uint40 stakeId,
-        uint256 stakedAmount,
-        uint256 stakeShares,
-        uint256 stakedDays
-    )
-        private
-    {
-        emit StakeStart(
-            msg.sender,
-            stakeId,
-            uint40(block.timestamp),
-            uint128(stakedAmount),
-            uint128(stakeShares),
-            uint16(stakedDays)
-        );
-    }
-
-    function _emitStakeGoodAccounting(
-        address stakerAddr,
-        uint40 stakeId,
-        uint256 stakedAmount,
-        uint256 stakeShares,
-        uint256 payout,
-        uint256 penalty
-    )
-        private
-    {
-        emit StakeGoodAccounting(
-            stakerAddr,
-            stakeId,
-            msg.sender,
-            uint40(block.timestamp),
-            uint128(stakedAmount),
-            uint128(stakeShares),
-            uint128(payout),
-            uint128(penalty)
-        );
-    }
-
-    function _emitStakeEnd(
-        uint40 stakeId,
-        uint256 stakedAmount,
-        uint256 stakeShares,
-        uint256 payout,
-        uint256 penalty,
-        uint256 servedDays,
-        bool prevUnlocked
-    )
-        private
-    {
-        emit StakeEnd(
-            msg.sender,
-            stakeId,
-            uint40(block.timestamp),
-            uint128(stakedAmount),
-            uint128(stakeShares),
-            uint128(payout),
-            uint128(penalty),
-            uint16(servedDays),
-            prevUnlocked
-        );
-    }
-
-    function _emitShareRateChange(uint256 shareRate, uint40 stakeId)
-        private
-    {
-        emit ShareRateChange(
-            stakeId,
-            uint40(block.timestamp),
-            uint40(shareRate)
-        );
     }
 }
