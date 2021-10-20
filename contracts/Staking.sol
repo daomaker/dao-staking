@@ -15,12 +15,14 @@ contract Staking is GlobalsAndUtility {
         address _originAddr
     )
     {
-        /* Initialize global shareRate to 1 */
-        globals.shareRate = uint40(1 * SHARE_RATE_SCALE);
+        require(IERC20Metadata(address(_stakingToken)).decimals() == TOKEN_DECIMALS, "STAKING: incompatible token decimals");
 
         stakingToken = _stakingToken;
         launchTime = _launchTime;
         originAddr = _originAddr;
+
+        /* Initialize global shareRate to 1 */
+        globals.shareRate = uint40(1 * SHARE_RATE_SCALE);
     }
 
     /**
@@ -119,7 +121,7 @@ contract Staking is GlobalsAndUtility {
      */
     function stakeEnd(uint256 stakeIndex, uint40 stakeIdParam)
         external
-        returns (uint256 stakeReturn, uint256 payout, uint256 penalty)
+        returns (uint256 stakeReturn, uint256 payout, uint256 penalty, uint256 cappedPenalty)
     {
         GlobalsCache memory g;
         _globalsLoad(g);
@@ -140,7 +142,6 @@ contract Staking is GlobalsAndUtility {
         uint256 servedDays = 0;
 
         bool prevUnlocked = (st._unlockedDay != 0);
-        uint256 cappedPenalty = 0;
 
         if (g._currentDay >= st._lockedDay) {
             if (prevUnlocked) {
@@ -196,7 +197,8 @@ contract Staking is GlobalsAndUtility {
         return (
             stakeReturn,
             payout,
-            penalty
+            penalty,
+            cappedPenalty
         );
     }
  
@@ -304,7 +306,7 @@ contract Staking is GlobalsAndUtility {
         view
         returns (uint256 payout)
     {
-        uint256 accRewardPerShare = dailyData[endDay].accRewardPerShare - dailyData[beginDay].accRewardPerShare;
+        uint256 accRewardPerShare = dailyData[endDay - 1].accRewardPerShare - dailyData[beginDay - 1].accRewardPerShare;
         payout = stakeSharesParam * accRewardPerShare / ACC_REWARD_MULTIPLIER;
         return payout;
     }
@@ -316,7 +318,7 @@ contract Staking is GlobalsAndUtility {
      */
     function _stakeStartBonusShares(uint256 newStakedAmount, uint256 newStakedDays)
         private
-        view
+        pure
         returns (uint256 bonusShares)
     {
         /*
@@ -375,11 +377,10 @@ contract Staking is GlobalsAndUtility {
             cappedExtraDays = newStakedDays <= LPB_MAX_DAYS ? newStakedDays - 1 : LPB_MAX_DAYS;
         }
 
-        uint256 stakingTokenDecimals = IERC20Metadata(address(stakingToken)).decimals();
-        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX * stakingTokenDecimals ? newStakedAmount : BPB_MAX * stakingTokenDecimals;
+        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX  ? newStakedAmount : BPB_MAX ;
 
-        bonusShares = cappedExtraDays * BPB * stakingTokenDecimals + cappedStakedAmount * LPB;
-        bonusShares = newStakedAmount * bonusShares / (LPB * BPB * stakingTokenDecimals);
+        bonusShares = cappedExtraDays * BPB + cappedStakedAmount * LPB;
+        bonusShares = newStakedAmount * bonusShares / (LPB * BPB);
 
         return bonusShares;
     }

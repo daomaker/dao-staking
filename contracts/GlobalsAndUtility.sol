@@ -55,7 +55,8 @@ abstract contract GlobalsAndUtility {
     uint40 launchTime;
     address originAddr;
 
-    uint256 internal constant ACC_REWARD_MULTIPLIER = 1e12;
+    uint256 internal constant ACC_REWARD_MULTIPLIER = 1e36;
+    uint256 internal constant TOKEN_DECIMALS = 18;
 
     /* Stake timing parameters */
     uint256 internal constant MIN_STAKE_DAYS = 1;
@@ -72,7 +73,7 @@ abstract contract GlobalsAndUtility {
 
     /* Stake shares Bigger Pays Better bonus constants used by _stakeStartBonusShares() */
     uint256 private constant BPB_BONUS_PERCENT = 10;
-    uint256 internal constant BPB_MAX = 150 * 1e6; //150M
+    uint256 internal constant BPB_MAX = 150 * 1e6 * 10 ** TOKEN_DECIMALS;
     uint256 internal constant BPB = BPB_MAX * 100 / BPB_BONUS_PERCENT;
 
     /* Share rate is scaled to increase precision */
@@ -182,7 +183,7 @@ abstract contract GlobalsAndUtility {
         view
         returns (uint256[] memory listDayStakeSharesTotal, uint256[] memory listDayPayoutTotal)
     {
-        require(beginDay < endDay && endDay <= globals.dailyDataCount, "STAKING: range invalid");
+        require(beginDay < endDay, "STAKING: range invalid");
 
         listDayStakeSharesTotal = new uint256[](endDay - beginDay);
         listDayPayoutTotal = new uint256[](endDay - beginDay);
@@ -368,15 +369,16 @@ abstract contract GlobalsAndUtility {
         view
     {
         rs._payoutTotal = dailyData[day].dayPayoutTotal;
+        rs._accRewardPerShare = day == 0 ? 0 : dailyData[day - 1].accRewardPerShare;
 
         if (g._stakePenaltyTotal != 0) {
             rs._payoutTotal += g._stakePenaltyTotal;
             g._stakePenaltyTotal = 0;
         }
 
-        uint256 accRewardPerShare = day == 0 ? 0 : dailyData[day - 1].accRewardPerShare;
-        accRewardPerShare += rs._payoutTotal * ACC_REWARD_MULTIPLIER / g._stakeSharesTotal;
-        rs._accRewardPerShare = accRewardPerShare;
+        if (g._stakeSharesTotal > 0) {
+            rs._accRewardPerShare += rs._payoutTotal * ACC_REWARD_MULTIPLIER / g._stakeSharesTotal;
+        }
     }
 
     function _dailyRoundCalcAndStore(GlobalsCache memory g, DailyRoundState memory rs, uint256 day)
@@ -384,9 +386,15 @@ abstract contract GlobalsAndUtility {
     {
         _dailyRoundCalc(g, rs, day);
 
-        dailyData[day].dayPayoutTotal = uint128(rs._payoutTotal);
-        dailyData[day].dayStakeSharesTotal = uint128(g._stakeSharesTotal);
         dailyData[day].accRewardPerShare = uint128(rs._accRewardPerShare);
+
+        if (g._stakeSharesTotal > 0) {
+            dailyData[day].dayStakeSharesTotal = uint128(g._stakeSharesTotal);
+            dailyData[day].dayPayoutTotal = uint128(rs._payoutTotal);
+        } else {
+            // nobody staking that day, move the reward to the next day if any
+            dailyData[day + 1].dayPayoutTotal += dailyData[day].dayPayoutTotal + uint128(rs._payoutTotal);
+        }
     }
 
     function _dailyDataUpdate(GlobalsCache memory g, uint256 beforeDay, bool isAutoUpdate)

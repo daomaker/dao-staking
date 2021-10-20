@@ -15,11 +15,6 @@ module.exports = {
         }
     },
     networks: {
-        hardhat: {
-            forking: {
-                url: `https://eth-kovan.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
-            }
-        },
         kovan: {
             url: `https://kovan.infura.io/v3/${process.env.INFURA_KEY}`,
             accounts: [`0x${process.env.PRIVATE_KEY}`],
