@@ -4,10 +4,8 @@ const { time } = require("@openzeppelin/test-helpers");
 describe("Staking smart contract", function() {
     let deployer, user1, user2, user3, contract, stakingToken, launchTime, currentDay;
 
-    const PRECISION_LOSS = "1000000000";
-    let shareRate = 1;
+    const PRECISION_LOSS = "1000000000000000";
 
-    // SC CONSTANTS BUST BE THE SAME FOR PROPER WORKING OF THIS UNIT TEST!
     const BPB_MAX_PERCENT = 0.1;
     const BPB = 1500000000;
     const LPB_MAX_PERCENT = 2;
@@ -17,13 +15,13 @@ describe("Staking smart contract", function() {
         return ethers.utils.parseUnits(value.toString(), decimals);
     }
 
-    const calcExpectedShares = (amount, days) => {
+    /*const calcExpectedShares = (amount, days) => {
         let amountBonus = amount / BPB;
         if (amountBonus > BPB_MAX_PERCENT) amountBonus = BPB_MAX_PERCENT;
         let daysBonus = (days - 1) / LPB;
         if (daysBonus > LPB_MAX_PERCENT) daysBonus = LPB_MAX_PERCENT;
-        const bonus = 1 + ((amountBonus + daysBonus) / shareRate);
-        const expectedShares = amount * bonus;
+        const bonus = 1 + (amountBonus + daysBonus);
+        const expectedShares = amount * bonus / shareRate;
         return expectedShares;
     }
 
@@ -31,13 +29,11 @@ describe("Staking smart contract", function() {
         let sharesBefore = calcExpectedShares(amountBefore, days);
         let sharesAfter = calcExpectedShares(amountAfter, days);
         return parseUnits(sharesAfter / sharesBefore, 5);
-    }
+    }*/
 
-    const stakeStart = async(user, amount, days) => {
+    const stakeStart = async(user, amount, days, expectedShares) => {
         contract = contract.connect(user);
 
-        let expectedShares = calcExpectedShares(amount, days);
-        expectedShares = parseUnits(expectedShares);
         amount = parseUnits(amount);
 
         const contractBalanceBefore = await stakingToken.balanceOf(contract.address);
@@ -51,13 +47,14 @@ describe("Staking smart contract", function() {
         expect(stakeInfo.lockedDay).to.equal(currentDay + 1);
         expect(stakeInfo.stakedDays).to.equal(days);
         expect(stakeInfo.stakedAmount).to.equal(amount);
-        expect(stakeInfo.stakeShares).to.closeTo(expectedShares, PRECISION_LOSS);
+        expect(stakeInfo.stakeShares).to.closeTo(parseUnits(expectedShares), PRECISION_LOSS);
 
         expect(contractBalanceAfter).to.equal(contractBalanceBefore.add(amount));
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal.add(stakeInfo.stakedAmount));
         expect(globalsAfter.nextStakeSharesTotal.add(globalsAfter.stakeSharesTotal)).to.equal(
             globalsBefore.nextStakeSharesTotal.add(globalsBefore.stakeSharesTotal).add(stakeInfo.stakeShares));
         expect(globalsAfter.stakePenaltyTotal).to.be.at.most(globalsBefore.stakePenaltyTotal);
+        expect(globalsAfter.dailyDataCount).to.equal(currentDay);
     }
 
     const checkStakeEnd = async(user, stakeIndex, expectedStakeReturn, expectedCappedPenalty) => {
@@ -72,28 +69,58 @@ describe("Staking smart contract", function() {
         expect(unstakeData.cappedPenalty).to.closeTo(expectedCappedPenalty, PRECISION_LOSS);
     }
 
-    const stakeEnd = async(user, stakeIndex) => {
+    const stakeGoodAccounting = async(user, stakeIndex, caller) => {
+        contract = contract.connect(user);
+        const stakeInfo = await contract.stakeLists(user.address, stakeIndex);
+        const unstakeData = await contract.callStatic.stakeEnd(stakeIndex, stakeInfo.stakeId);
+
+        contract = contract.connect(caller);
+        const userBalanceBefore = await stakingToken.balanceOf(user.address);
+        const contractBalanceBefore = await stakingToken.balanceOf(contract.address);
+        const originAddrBalanceBefore = await stakingToken.balanceOf(deployer.address);
+        const globalsBefore = await contract.globals();
+        await contract.stakeGoodAccounting(user.address, stakeIndex, stakeInfo.stakeId);
+        const userBalanceAfter = await stakingToken.balanceOf(user.address);
+        const contractBalanceAfter = await stakingToken.balanceOf(contract.address);
+        const originAddrBalanceAfter = await stakingToken.balanceOf(deployer.address);
+        const globalsAfter = await contract.globals();
+        
+        expect(userBalanceAfter).to.equal(userBalanceBefore);
+        expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.cappedPenalty.div(2)));
+        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2)));
+        
+        expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal);
+        expect(globalsAfter.stakeSharesTotal.add(globalsAfter.nextStakeSharesTotal)).to.equal(
+            globalsBefore.stakeSharesTotal.add(globalsBefore.nextStakeSharesTotal).sub(stakeInfo.stakeShares));
+        expect(globalsAfter.stakePenaltyTotal).to.equal(globalsBefore.stakePenaltyTotal.add(unstakeData.cappedPenalty.div(2)));
+        expect(globalsAfter.shareRate).to.equal(globalsBefore.shareRate);
+        expect(globalsAfter.dailyDataCount).to.equal(currentDay);
+    }
+
+    const stakeEnd = async(user, stakeIndex, expectedShareRate) => {
         contract = contract.connect(user);
         const stakeInfo = await contract.stakeLists(user.address, stakeIndex);
         const unstakeData = await contract.callStatic.stakeEnd(stakeIndex, stakeInfo.stakeId);
         
+        const userBalanceBefore = await stakingToken.balanceOf(user.address);
         const contractBalanceBefore = await stakingToken.balanceOf(contract.address);
         const originAddrBalanceBefore = await stakingToken.balanceOf(deployer.address);
         const globalsBefore = await contract.globals();
         await contract.stakeEnd(stakeIndex, stakeInfo.stakeId);
+        const userBalanceAfter = await stakingToken.balanceOf(user.address);
         const contractBalanceAfter = await stakingToken.balanceOf(contract.address);
         const originAddrBalanceAfter = await stakingToken.balanceOf(deployer.address);
         const globalsAfter = await contract.globals();
 
+        expect(userBalanceAfter).to.equal(userBalanceBefore.add(unstakeData.stakeReturn));
         expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.stakeReturn).add(unstakeData.cappedPenalty.div(2)));
         expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2)));
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal.sub(stakeInfo.stakedAmount));
         expect(globalsAfter.nextStakeSharesTotal.add(globalsAfter.stakeSharesTotal)).to.equal(
             globalsBefore.nextStakeSharesTotal.add(globalsBefore.stakeSharesTotal).sub(stakeInfo.stakeShares));
         expect(globalsAfter.stakePenaltyTotal).to.equal(globalsBefore.stakePenaltyTotal.add(unstakeData.cappedPenalty.div(2)));
-
-        const minShareRate = calcShareRate(stakeInfo.stakedAmount, unstakeData.stakeReturn, stakeInfo.stakedDays);
-        expect(globalsAfter.shareRate).to.be.at.least(minShareRate);
+        expect(globalsAfter.shareRate).to.closeTo(parseUnits(expectedShareRate, 5), "1000");
+        expect(globalsAfter.dailyDataCount).to.equal(currentDay);
     }
 
     const fundRewards = async(amountPerDay, daysCount, shiftInDays) => {
@@ -141,42 +168,166 @@ describe("Staking smart contract", function() {
         stakingToken.approve(contract.address, amount);
     }
 
+    before(async function() {
+        await init();
+    });
 
-
-    describe("full flow test 1", function() {
-        before(async function() {
-            await init();
-        });
-
+    describe("Simple test with 2 users staking the same (small) amount for the same time", function() {
         it("Deployer funds", async function() {
             await fundRewards(10, 10, 0);
         });
     
         it("User 1 and 2 stake 100 tokens for 10 days", async function() {
-            await stakeStart(user1, 100, 10);
-            await stakeStart(user2, 100, 10);
+            await stakeStart(user1, 100, 10, "100.494");
+            await stakeStart(user2, 100, 10, "100.494");
         });
     
         it("Checks multiple days for reward and penalty of users, who then unstake after 20 days", async function() {
             await checkStakeEnd(user1, 0, 100, 0);
             await checkStakeEnd(user2, 0, 100, 0);
+
             increaseDays(1);
             await checkStakeEnd(user1, 0, 0, 100);
             await checkStakeEnd(user2, 0, 0, 100);
+
             increaseDays(4);
             await checkStakeEnd(user1, 0, 0, 120);
             await checkStakeEnd(user2, 0, 0, 120);
+
             increaseDays(5);
             await checkStakeEnd(user1, 0, 0, 145);
             await checkStakeEnd(user2, 0, 0, 145);
+
             increaseDays(1);
             await checkStakeEnd(user1, 0, 150, 0);
             await checkStakeEnd(user2, 0, 150, 0);
+
             increaseDays(10);
             await checkStakeEnd(user1, 0, 150, 0);
             await checkStakeEnd(user2, 0, 150, 0);
-            await stakeEnd(user1, 0);
-            await stakeEnd(user2, 0);
+            await stakeEnd(user1, 0, 1.5);
+            await stakeEnd(user2, 0, 1.5);
+        });
+    });
+
+    describe("Test with 2 users staking for different times, small amounts", function() {
+        it("User 1 stakes 100 tokens for 2 years, user 2 for 1 year", async function() {
+            await stakeStart(user1, 100, 730, 93.37);
+            await stakeStart(user2, 100, 365, 80);
+        });
+
+        it("Deployer funds multiple times", async function() {
+            await fundRewards(5, 365, 0);
+            await fundRewards(5, 365, 0);
+            await fundRewards(5, 365, 365);
+            await fundRewards(5, 365, 365);
+        });
+
+        it("Checks early fees", async function() {
+            await checkStakeEnd(user1, 0, 100, 0);
+            await checkStakeEnd(user2, 0, 100, 0);
+
+            increaseDays(1);
+            await checkStakeEnd(user1, 0, 0, 100);
+            await checkStakeEnd(user2, 0, 0, 100);
+
+            increaseDays(4);
+            await checkStakeEnd(user1, 0, 0, 121.543);
+            await checkStakeEnd(user2, 0, 0, 118.457);
+
+            increaseDays(86);
+            await checkStakeEnd(user1, 0, 0, 584.703);
+            await checkStakeEnd(user2, 0, 0, 515.296);
+        });
+
+        it("user 2 has staked for half of the period he committed to, his stake return is now minimally the stake amount he put in", async function() {
+            increaseDays(93);
+            await checkStakeEnd(user2, 0, 100, 844.437);
+        });
+
+        it("user 2 stake ends, 0 penalty and unstakes", async function() {
+            increaseDays(182);
+            await checkStakeEnd(user2, 0, 1784.259, 0);
+            await stakeEnd(user2, 0, 26.764);
+        });
+
+        it("user 1 has staked for half of the period he committed to", async function() {
+            await checkStakeEnd(user1, 0, 100, 1965.74);
+        });
+
+        it("user 1 now has all the reward in the pool for himself", async function() {
+            increaseDays(365);
+            await checkStakeEnd(user1, 0, 5715.74, 0);
+            increaseDays(1);
+            await checkStakeEnd(user1, 0, 5715.74, 0);
+            increaseDays(1);
+            await checkStakeEnd(user1, 0, 5715.74, 0);
+        });
+
+        it("user 1 late fee", async function() {
+            const totalReturn = 5715.74;
+            increaseDays(12);
+            await checkStakeEnd(user1, 0, totalReturn, 0);
+
+            // late fee start
+            increaseDays(350);
+            await checkStakeEnd(user1, 0, totalReturn / 2, totalReturn / 2);
+
+            await contract.dailyDataUpdate(currentDay);
+
+            increaseDays(349);
+            await checkStakeEnd(user1, 0, totalReturn / 700, totalReturn / 700 * 699);
+
+            increaseDays(1);
+            await checkStakeEnd(user1, 0, 0, totalReturn);
+        });
+
+        it("User 3 stakes for 10 days and ends stake for user, getting half of his total return", async function() {
+            increaseDays(10);
+
+            await stakeStart(user3, 100, 10, 3.755);
+            increaseDays(1);
+            await stakeGoodAccounting(user1, 0, user3);
+            increaseDays(1);
+            await checkStakeEnd(user3, 0, 0, 2957.87);
+
+            await expect(contract.stakeGoodAccounting(user1.address, 0, 3)).to.be.revertedWith("STAKING: Stake already unlocked");
+            await expect(contract.stakeGoodAccounting(user3.address, 0, 5)).to.be.revertedWith("STAKING: Stake not fully served");
+
+            increaseDays(10);
+            await checkStakeEnd(user3, 0, 2957.87, 0);
+        });
+    });
+
+    describe("Test max bonuses", function() {
+
+    });
+
+    describe("Test input require statements in external functions", function () {
+        it("Stake start inputs", async function() {
+            contract = contract.connect(user1);
+            await expect(contract.stakeStart(100, 0)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
+            await expect(contract.stakeStart(0, 100)).to.be.revertedWith("STAKING: newStakedAmount must be at least minimum shareRate");
+            await expect(contract.stakeStart(100, 55555)).to.be.revertedWith("STAKING: newStakedDays higher than maximum");
+        });
+
+        it("Stake end inputs", async function() {
+            await expect(contract.stakeEnd(0, 10)).to.be.revertedWith("STAKING: stakeIdParam not in stake");
+            await expect(contract.stakeEnd(10, 10)).to.be.revertedWith("STAKING: stakeIndex invalid");
+        });
+
+        it("Stake good accounting inputs", async function() {
+            await expect(contract.stakeGoodAccounting(user1.address, 0, 10)).to.be.revertedWith("STAKING: stakeIdParam not in stake");
+            await expect(contract.stakeGoodAccounting(user1.address, 10, 10)).to.be.revertedWith("STAKING: stakeIndex invalid");
+            await expect(contract.stakeGoodAccounting(deployer.address, 0, 10)).to.be.revertedWith("STAKING: Empty stake list");
+        });
+
+        it("Fund rewards inputs", async function() {
+            await expect(contract.fundRewards(5, 366, 0)).to.be.revertedWith("STAKING: too many days");
+        });
+
+        it("Daily data update inputs", async function () {
+            await expect(contract.dailyDataUpdate(currentDay + 1)).to.be.revertedWith("STAKING: beforeDay cannot be in the future");
         });
     });
 });
