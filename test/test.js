@@ -71,9 +71,13 @@ describe("Staking smart contract", function() {
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal);
         expect(globalsAfter.stakeSharesTotal.add(globalsAfter.nextStakeSharesTotal)).to.equal(
             globalsBefore.stakeSharesTotal.add(globalsBefore.nextStakeSharesTotal).sub(stakeInfo.stakeShares));
-        expect(globalsAfter.stakePenaltyTotal).to.equal(globalsBefore.stakePenaltyTotal.add(unstakeData.cappedPenalty.div(2)));
         expect(globalsAfter.shareRate).to.equal(globalsBefore.shareRate);
         expect(globalsAfter.dailyDataCount).to.equal(currentDay);
+
+        const stakeInfoAfter = await contract.stakeLists(user.address, stakeIndex);
+        expect(stakeInfoAfter.stakedAmount).to.equal(stakeInfo.stakedAmount);
+        expect(stakeInfoAfter.stakeShares).to.equal(stakeInfo.stakeShares);
+        expect(stakeInfoAfter.unlockedDay).to.equal(currentDay);
     }
 
     const stakeEnd = async(user, stakeIndex, expectedShareRate) => {
@@ -92,13 +96,16 @@ describe("Staking smart contract", function() {
         const globalsAfter = await contract.globals();
 
         expect(userBalanceAfter).to.equal(userBalanceBefore.add(unstakeData.stakeReturn));
-        expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.stakeReturn).add(unstakeData.cappedPenalty.div(2)));
-        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2).mul(3).div(5)));
-       
+        if (stakeInfo.unlockedDay == 0) {
+            expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.stakeReturn).sub(unstakeData.cappedPenalty.div(2)));
+            expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2).mul(3).div(5)));
+            expect(globalsAfter.nextStakeSharesTotal.add(globalsAfter.stakeSharesTotal)).to.equal(
+                globalsBefore.nextStakeSharesTotal.add(globalsBefore.stakeSharesTotal).sub(stakeInfo.stakeShares));
+        } else {
+            expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.stakeReturn));
+            expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore);
+        }
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal.sub(stakeInfo.stakedAmount));
-        expect(globalsAfter.nextStakeSharesTotal.add(globalsAfter.stakeSharesTotal)).to.equal(
-            globalsBefore.nextStakeSharesTotal.add(globalsBefore.stakeSharesTotal).sub(stakeInfo.stakeShares));
-        expect(globalsAfter.stakePenaltyTotal).to.equal(globalsBefore.stakePenaltyTotal.add(unstakeData.cappedPenalty.div(2)));
         expect(globalsAfter.shareRate).to.closeTo(parseUnits(expectedShareRate, 5), "1000");
         expect(globalsAfter.dailyDataCount).to.equal(currentDay);
     }
@@ -276,6 +283,25 @@ describe("Staking smart contract", function() {
 
             increaseDays(10);
             await checkStakeEnd(user3, 0, 2957.87, 0);
+            await stakeEnd(user3, 0, 791.643);
+        });
+
+        it("User 1 stakes for 200 days, unstakes after 120 days", async function() {
+            await fundRewards(10, 200, 0);
+
+            await stakeStart(user1, 100, 200, 0.14013);
+            increaseDays(120);
+
+            await checkStakeEnd(user1, 1, 289.999, 999.999);
+            await stakeEnd(user1, 1, 2295.765);
+        });
+
+        it("User 1 unstakes the first stake with late fee", async function() {
+            await stakeEnd(user1, 0, 2295.765);
+        });
+
+        it("User 1 stakes again", async function() {
+            await stakeStart(user1, 100, 10, 0.04377);
         });
     });
 
