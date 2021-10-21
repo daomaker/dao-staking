@@ -178,8 +178,8 @@ describe("Staking smart contract", function() {
         });
     
         it("User 1 and 2 stake 100 tokens for 10 days", async function() {
-            await stakeStart(user1, 100, 10, "100.494");
-            await stakeStart(user2, 100, 10, "100.494");
+            await stakeStart(user1, 100, 10, 100.494);
+            await stakeStart(user2, 100, 10, 100.494);
         });
     
         it("Checks multiple days for reward and penalty of users, who then unstake after 20 days", async function() {
@@ -299,8 +299,27 @@ describe("Staking smart contract", function() {
         });
     });
 
-    describe("Test max bonuses", function() {
+    describe("Test share bonuses", function() {
+        it("Check max bonus for bigger amount (6.666%)", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("100000000"), 1);
+            expect(bonusShares).to.closeTo(parseUnits("6666666.666"), PRECISION_LOSS);
+        });
 
+        it("Check max bonus for bigger amount (10% capped)", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("300000000"), 1);
+            expect(bonusShares).to.equal(parseUnits("30000000"));
+        });
+
+        it("Check max bonus for longer time", async function() {
+            let bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 5);
+            expect(bonusShares).to.closeTo(parseUnits("1.0022"), PRECISION_LOSS);
+
+            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 10);
+            expect(bonusShares).to.closeTo(parseUnits("2"), PRECISION_LOSS);
+
+            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 15);
+            expect(bonusShares).to.closeTo(parseUnits("2"), PRECISION_LOSS);
+        });
     });
 
     describe("Test input require statements in external functions", function () {

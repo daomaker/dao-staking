@@ -249,7 +249,7 @@ contract Staking is GlobalsAndUtility {
         /* Enforce the maximum stake time */
         require(newStakedDays <= MAX_STAKE_DAYS, "STAKING: newStakedDays higher than maximum");
 
-        uint256 bonusShares = _stakeStartBonusShares(newStakedAmount, newStakedDays);
+        uint256 bonusShares = stakeStartBonusShares(newStakedAmount, newStakedDays);
         uint256 newStakeShares = (newStakedAmount + bonusShares) * SHARE_RATE_SCALE / g._shareRate;
 
         /* Ensure newStakedAmount is enough for at least one stake share */
@@ -316,8 +316,8 @@ contract Staking is GlobalsAndUtility {
      * @param newStakedAmount Amount of staking token
      * @param newStakedDays Number of days to stake
      */
-    function _stakeStartBonusShares(uint256 newStakedAmount, uint256 newStakedDays)
-        private
+    function stakeStartBonusShares(uint256 newStakedAmount, uint256 newStakedDays)
+        public
         pure
         returns (uint256 bonusShares)
     {
@@ -377,7 +377,7 @@ contract Staking is GlobalsAndUtility {
             cappedExtraDays = newStakedDays <= LPB_MAX_DAYS ? newStakedDays - 1 : LPB_MAX_DAYS;
         }
 
-        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX  ? newStakedAmount : BPB_MAX ;
+        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX ? newStakedAmount : BPB_MAX;
 
         bonusShares = cappedExtraDays * BPB + cappedStakedAmount * LPB;
         bonusShares = newStakedAmount * bonusShares / (LPB * BPB);
@@ -531,7 +531,7 @@ contract Staking is GlobalsAndUtility {
                 the user re-staked this stakeReturn, factoring in any bonuses they would
                 receive in stakeStart().
             */
-            uint256 bonusShares = _stakeStartBonusShares(stakeReturn, st._stakedDays);
+            uint256 bonusShares = stakeStartBonusShares(stakeReturn, st._stakedDays);
             uint256 newShareRate = (stakeReturn + bonusShares) * SHARE_RATE_SCALE / st._stakeShares;
 
             if (newShareRate > SHARE_RATE_MAX) {
