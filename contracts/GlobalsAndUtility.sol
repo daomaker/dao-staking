@@ -1,8 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./helpers/IERC20Burnable.sol";
 
 abstract contract GlobalsAndUtility {
     event DailyDataUpdate(
@@ -51,7 +50,7 @@ abstract contract GlobalsAndUtility {
         uint40 shareRate
     );
 
-    IERC20 stakingToken;
+    IERC20Burnable stakingToken;
     uint40 launchTime;
     address originAddr;
 

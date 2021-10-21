@@ -6,30 +6,9 @@ describe("Staking smart contract", function() {
 
     const PRECISION_LOSS = "1000000000000000";
 
-    const BPB_MAX_PERCENT = 0.1;
-    const BPB = 1500000000;
-    const LPB_MAX_PERCENT = 2;
-    const LPB = 1820;
-
     const parseUnits = (value, decimals = 18) => {
         return ethers.utils.parseUnits(value.toString(), decimals);
     }
-
-    /*const calcExpectedShares = (amount, days) => {
-        let amountBonus = amount / BPB;
-        if (amountBonus > BPB_MAX_PERCENT) amountBonus = BPB_MAX_PERCENT;
-        let daysBonus = (days - 1) / LPB;
-        if (daysBonus > LPB_MAX_PERCENT) daysBonus = LPB_MAX_PERCENT;
-        const bonus = 1 + (amountBonus + daysBonus);
-        const expectedShares = amount * bonus / shareRate;
-        return expectedShares;
-    }
-
-    const calcShareRate = (amountBefore, amountAfter, days) => {
-        let sharesBefore = calcExpectedShares(amountBefore, days);
-        let sharesAfter = calcExpectedShares(amountAfter, days);
-        return parseUnits(sharesAfter / sharesBefore, 5);
-    }*/
 
     const stakeStart = async(user, amount, days, expectedShares) => {
         contract = contract.connect(user);
@@ -87,7 +66,7 @@ describe("Staking smart contract", function() {
         
         expect(userBalanceAfter).to.equal(userBalanceBefore);
         expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.cappedPenalty.div(2)));
-        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2)));
+        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2).mul(3).div(5)));
         
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal);
         expect(globalsAfter.stakeSharesTotal.add(globalsAfter.nextStakeSharesTotal)).to.equal(
@@ -114,7 +93,8 @@ describe("Staking smart contract", function() {
 
         expect(userBalanceAfter).to.equal(userBalanceBefore.add(unstakeData.stakeReturn));
         expect(contractBalanceAfter).to.equal(contractBalanceBefore.sub(unstakeData.stakeReturn).add(unstakeData.cappedPenalty.div(2)));
-        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2)));
+        expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore.add(unstakeData.cappedPenalty.div(2).mul(3).div(5)));
+       
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal.sub(stakeInfo.stakedAmount));
         expect(globalsAfter.nextStakeSharesTotal.add(globalsAfter.stakeSharesTotal)).to.equal(
             globalsBefore.nextStakeSharesTotal.add(globalsBefore.stakeSharesTotal).sub(stakeInfo.stakeShares));

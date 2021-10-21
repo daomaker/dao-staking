@@ -1,16 +1,16 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GlobalsAndUtility.sol";
+import "./helpers/IERC20Burnable.sol";
 
 contract Staking is GlobalsAndUtility {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Burnable;
 
     constructor(
-        IERC20 _stakingToken,
+        IERC20Burnable _stakingToken, // MUST BE BURNABLE
         uint40 _launchTime,
         address _originAddr
     )
@@ -510,11 +510,16 @@ contract Staking is GlobalsAndUtility {
     function _splitPenaltyProceeds(GlobalsCache memory g, uint256 penalty)
         private
     {
-        /* Split a penalty 50:50 between Origin and stakePenaltyTotal */
+        /* Split a penalty 50:50 between (Origin + burn) and stakePenaltyTotal */
         uint256 splitPenalty = penalty / 2;
 
         if (splitPenalty != 0) {
-            stakingToken.safeTransfer(originAddr, splitPenalty);
+            //30% of the total penalty is sent to origin address
+            uint256 originPenalty = splitPenalty * 3 / 5;
+            stakingToken.safeTransfer(originAddr, originPenalty);
+
+            //20% of the total penalty is burned
+            stakingToken.burn(splitPenalty - originPenalty);
         }
 
         /* Use the other half of the penalty to account for an odd-numbered penalty */
