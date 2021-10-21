@@ -386,7 +386,7 @@ abstract contract GlobalsAndUtility {
     {
         _dailyRoundCalc(g, rs, day);
 
-        dailyData[day].accRewardPerShare = uint128(rs._accRewardPerShare);
+        dailyData[day].accRewardPerShare = rs._accRewardPerShare;
 
         if (g._stakeSharesTotal > 0) {
             dailyData[day].dayStakeSharesTotal = uint128(g._stakeSharesTotal);
