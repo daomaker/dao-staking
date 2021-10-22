@@ -387,10 +387,21 @@ contract Staking is GlobalsAndUtility {
 
     function _stakeUnlock(GlobalsCache memory g, StakeCache memory st)
         private
-        pure
+        view
     {
         g._stakeSharesTotal -= st._stakeShares;
         st._unlockedDay = g._currentDay;
+
+        /* 
+        Users' shares aren't removed at (s._lockedDay + s._stakedDays) day from g.stakeSharesTotal.
+        Therefore, reward is allocated for them even though they can't claim it.
+        That's why the allocated unclaimable reward is added as reward for the next day to be distributed to the other stakers.
+        */
+        uint256 endDay = st._lockedDay + st._stakedDays;
+        if (g._currentDay > endDay) {
+            uint256 allocatedUnclaimableReward = _calcPayoutRewards(st._stakeShares, endDay, g._currentDay);
+            g._stakePenaltyTotal += allocatedUnclaimableReward;
+        }
     }
 
     function _stakePerformance(StakeCache memory st, uint256 servedDays)

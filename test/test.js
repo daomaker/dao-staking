@@ -298,10 +298,8 @@ describe("Staking smart contract", function() {
 
         it("User 1 unstakes the first stake with late fee", async function() {
             await stakeEnd(user1, 0, 2295.765);
-        });
-
-        it("User 1 stakes again", async function() {
-            await stakeStart(user1, 100, 10, 0.04377);
+        
+            expect(await stakingToken.balanceOf(contract.address)).to.closeTo(parseUnits(1310), PRECISION_LOSS);
         });
     });
 
@@ -329,6 +327,10 @@ describe("Staking smart contract", function() {
     });
 
     describe("Test input require statements in external functions", function () {
+        before(async function() {
+            await stakeStart(user1, 100, 10, 0.04377);
+        });
+
         it("Stake start inputs", async function() {
             contract = contract.connect(user1);
             await expect(contract.stakeStart(100, 0)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
@@ -353,6 +355,30 @@ describe("Staking smart contract", function() {
 
         it("Daily data update inputs", async function () {
             await expect(contract.dailyDataUpdate(currentDay + 1)).to.be.revertedWith("STAKING: beforeDay cannot be in the future");
+        });
+    });
+
+    describe("Test distributing allocated (for late unstakers) unclaimable reward", function() {
+        before(async function() {
+            await init(); //reset
+            await fundRewards(10, 15, 0);
+
+            await stakeStart(user1, 100, 10, 100.494);
+            increaseDays(5);
+            await stakeStart(user2, 100, 10, 100.494);
+            increaseDays(6);
+            await checkStakeEnd(user1, 0, 175, 0);
+        });
+
+        it("User 1 unstakes 3 days late, his allocated unclaimable reward is added as reward for the next day", async function () {
+            increaseDays(3);
+            await stakeEnd(user1, 0, 1.75);
+        });
+
+        it("User 2 gets the unclaimable reward by user 1", async function() {
+            increaseDays(2);
+            await checkStakeEnd(user2, 0, 175, 0);
+            await stakeEnd(user2, 0, 1.75);
         });
     });
 });
