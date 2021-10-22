@@ -392,7 +392,7 @@ abstract contract GlobalsAndUtility {
             dailyData[day].dayPayoutTotal = uint128(rs._payoutTotal);
         } else {
             // nobody staking that day, move the reward to the next day if any
-            dailyData[day + 1].dayPayoutTotal += dailyData[day].dayPayoutTotal + uint128(rs._payoutTotal);
+            dailyData[day + 1].dayPayoutTotal += uint128(rs._payoutTotal);
         }
     }
 
