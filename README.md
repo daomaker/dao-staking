@@ -6,6 +6,6 @@ Fork of HEX https://etherscan.io/address/0x2b591e99afe9f32eaa6214f7b7629768c40ee
 - added function that funds staking token as reward (in HEX there's fixed minted inflation)
 - transferring the staking token instead of burning and minting
 - emitting events with unpacked parameters
-- saving daily rewards as sums instead of derivatives (as gas optimization)
+- saving daily rewards also as sums instead of only derivatives (as gas optimization)
 - added burn fee (50% go to stakers, 30% to origin wallet and 20% burned)
 - distributing allocated unclaimable reward of late unstakers
