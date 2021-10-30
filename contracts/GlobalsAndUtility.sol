@@ -50,6 +50,12 @@ abstract contract GlobalsAndUtility {
         uint40 shareRate
     );
 
+    event RewardsFund(
+        uint128 amountPerDay,
+        uint16 daysCount,
+        uint16 shiftInDays
+    );
+
     IERC20Burnable stakingToken;
     uint40 launchTime;
     address originAddr;

@@ -133,13 +133,14 @@ describe("Staking smart contract", function() {
     const init = async() => {
         [deployer, user1, user2, user3] = await ethers.getSigners();
     
-        launchTime = (await time.latest()).toString();
+        launchTime = (Number(await time.latest()) + 10).toString();
         currentDay = 0;
 
         const ERC20Mock = await ethers.getContractFactory("ERC20Mock");
         stakingToken = await ERC20Mock.deploy("MOCK1", "MOCK1", deployer.address, parseUnits("12000000000"), 18);
         const StakingSC = await ethers.getContractFactory("Staking");
         contract = await StakingSC.deploy(stakingToken.address, launchTime, deployer.address);
+        await time.increase(10);
 
         const amount = parseUnits("3000000000");
         stakingToken.transfer(user1.address, amount);
