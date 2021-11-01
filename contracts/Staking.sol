@@ -381,7 +381,10 @@ contract Staking is GlobalsAndUtility {
             cappedExtraDays = newStakedDays <= LPB_MAX_DAYS ? newStakedDays - 1 : LPB_MAX_DAYS;
         }
 
-        uint256 cappedStakedAmount = newStakedAmount <= BPB_MAX ? newStakedAmount : BPB_MAX;
+        uint256 cappedStakedAmount = newStakedAmount >= BPB_FROM_AMOUNT ? newStakedAmount - BPB_FROM_AMOUNT : 0;
+        if (cappedStakedAmount > BPB_MAX) {
+            cappedStakedAmount = BPB_MAX;
+        }
 
         bonusShares = cappedExtraDays * BPB + cappedStakedAmount * LPB;
         bonusShares = newStakedAmount * bonusShares / (LPB * BPB);

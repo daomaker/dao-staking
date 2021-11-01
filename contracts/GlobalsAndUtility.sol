@@ -80,6 +80,7 @@ abstract contract GlobalsAndUtility {
     uint256 private constant BPB_BONUS_PERCENT = 10;
     uint256 internal constant BPB_MAX = 150 * 1e6 * 10 ** TOKEN_DECIMALS;
     uint256 internal constant BPB = BPB_MAX * 100 / BPB_BONUS_PERCENT;
+    uint256 internal constant BPB_FROM_AMOUNT = 50000 * 10 ** TOKEN_DECIMALS;
 
     /* Share rate is scaled to increase precision */
     uint256 internal constant SHARE_RATE_SCALE = 1e5;

@@ -294,11 +294,11 @@ describe("Staking smart contract", function() {
             increaseDays(120);
 
             await checkStakeEnd(user1, 1, 289.999, 999.999);
-            await stakeEnd(user1, 1, 2295.765);
+            await stakeEnd(user1, 1, 2295.744);
         });
 
         it("User 1 unstakes the first stake with late fee", async function() {
-            await stakeEnd(user1, 0, 2295.765);
+            await stakeEnd(user1, 0, 2295.744);
         
             expect(await stakingToken.balanceOf(contract.address)).to.closeTo(parseUnits(1310), PRECISION_LOSS);
         });
@@ -307,12 +307,12 @@ describe("Staking smart contract", function() {
     describe("Test share bonuses", function() {
         it("Check max bonus for bigger amount (6.666%)", async function() {
             const bonusShares = await contract.stakeStartBonusShares(parseUnits("100000000"), 1);
-            expect(bonusShares).to.closeTo(parseUnits("6666666.666"), PRECISION_LOSS);
+            expect(bonusShares).to.closeTo(parseUnits("6663333.333"), PRECISION_LOSS);
         });
 
         it("Check max bonus for bigger amount (10% capped)", async function() {
-            const bonusShares = await contract.stakeStartBonusShares(parseUnits("300000000"), 1);
-            expect(bonusShares).to.equal(parseUnits("30000000"));
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("150050000"), 1);
+            expect(bonusShares).to.equal(parseUnits("15005000"));
         });
 
         it("Check max bonus for longer time", async function() {
