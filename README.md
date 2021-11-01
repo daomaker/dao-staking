@@ -9,3 +9,5 @@ Fork of HEX https://etherscan.io/address/0x2b591e99afe9f32eaa6214f7b7629768c40ee
 - saving daily rewards also as sums instead of only derivatives (as gas optimization)
 - added burn fee (50% go to stakers, 30% to origin wallet and 20% burned)
 - distributing allocated unclaimable reward of late unstakers
+- bonus for staking more amount starts from BPB_FROM_AMOUNT instead of 0
+- changed staking constants
