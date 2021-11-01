@@ -64,21 +64,21 @@ abstract contract GlobalsAndUtility {
     uint256 internal constant TOKEN_DECIMALS = 18;
 
     /* Stake timing parameters */
-    uint256 internal constant MIN_STAKE_DAYS = 1;
-    uint256 internal constant MAX_STAKE_DAYS = 5555; // Approx 15 years
-    uint256 internal constant EARLY_PENALTY_MIN_DAYS = 90;
+    uint256 internal constant MIN_STAKE_DAYS = 30;
+    uint256 internal constant MAX_STAKE_DAYS = 1095; // Approx 3 years
+    uint256 internal constant EARLY_PENALTY_MIN_DAYS = 30;
     uint256 internal constant LATE_PENALTY_GRACE_DAYS = 14;
     uint256 internal constant LATE_PENALTY_SCALE_DAYS = 700;
 
     /* Stake shares Longer Pays Better bonus constants used by _stakeStartBonusShares() */
-    uint256 private constant LPB_BONUS_PERCENT = 20;
-    uint256 private constant LPB_BONUS_MAX_PERCENT = 200;
+    uint256 private constant LPB_BONUS_PERCENT = 100;
+    uint256 private constant LPB_BONUS_MAX_PERCENT = 300;
     uint256 internal constant LPB = 364 * 100 / LPB_BONUS_PERCENT;
     uint256 internal constant LPB_MAX_DAYS = LPB * LPB_BONUS_MAX_PERCENT / 100;
 
     /* Stake shares Bigger Pays Better bonus constants used by _stakeStartBonusShares() */
-    uint256 private constant BPB_BONUS_PERCENT = 10;
-    uint256 internal constant BPB_MAX = 150 * 1e6 * 10 ** TOKEN_DECIMALS;
+    uint256 private constant BPB_BONUS_PERCENT = 50;
+    uint256 internal constant BPB_MAX = 1e6 * 10 ** TOKEN_DECIMALS;
     uint256 internal constant BPB = BPB_MAX * 100 / BPB_BONUS_PERCENT;
     uint256 internal constant BPB_FROM_AMOUNT = 50000 * 10 ** TOKEN_DECIMALS;
 
