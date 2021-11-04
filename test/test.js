@@ -3,10 +3,10 @@ const { time } = require("@openzeppelin/test-helpers");
 
 // NEEDS TO BE MODIFIED FOR THE NEW CONSTANTS
 
-/*describe("Staking smart contract", function() {
+describe("Staking smart contract", function() {
     let deployer, user1, user2, user3, contract, stakingToken, launchTime, currentDay;
 
-    const PRECISION_LOSS = "1000000000000000";
+    const PRECISION_LOSS = "1000000000000000000";
 
     const parseUnits = (value, decimals = 18) => {
         return ethers.utils.parseUnits(value.toString(), decimals);
@@ -108,7 +108,7 @@ const { time } = require("@openzeppelin/test-helpers");
             expect(originAddrBalanceAfter).to.equal(originAddrBalanceBefore);
         }
         expect(globalsAfter.lockedStakeTotal).to.equal(globalsBefore.lockedStakeTotal.sub(stakeInfo.stakedAmount));
-        expect(globalsAfter.shareRate).to.closeTo(parseUnits(expectedShareRate, 5), "1000");
+        expect(globalsAfter.shareRate).to.closeTo(parseUnits(expectedShareRate, 5), "100000");
         expect(globalsAfter.dailyDataCount).to.equal(currentDay);
     }
 
@@ -158,18 +158,18 @@ const { time } = require("@openzeppelin/test-helpers");
         stakingToken.approve(contract.address, amount);
     }
 
-    before(async function() {
-        await init();
-    });
-
     describe("Simple test with 2 users staking the same (small) amount for the same time", function() {
+        before(async function() {
+            await init();
+        });
+
         it("Deployer funds", async function() {
-            await fundRewards(10, 10, 0);
+            await fundRewards(10, 20, 0);
         });
     
-        it("User 1 and 2 stake 100 tokens for 10 days", async function() {
-            await stakeStart(user1, 100, 10, 100.494);
-            await stakeStart(user2, 100, 10, 100.494);
+        it("User 1 and 2 stake 100 tokens for 20 days", async function() {
+            await stakeStart(user1, 100, 20, 131);
+            await stakeStart(user2, 100, 20, 131);
         });
     
         it("Checks multiple days for reward and penalty of users, who then unstake after 20 days", async function() {
@@ -189,21 +189,25 @@ const { time } = require("@openzeppelin/test-helpers");
             await checkStakeEnd(user2, 0, 0, 145);
 
             increaseDays(1);
-            await checkStakeEnd(user1, 0, 150, 0);
-            await checkStakeEnd(user2, 0, 150, 0);
+            await checkStakeEnd(user1, 0, 0, 150);
+            await checkStakeEnd(user2, 0, 0, 150);
 
             increaseDays(10);
-            await checkStakeEnd(user1, 0, 150, 0);
-            await checkStakeEnd(user2, 0, 150, 0);
-            await stakeEnd(user1, 0, 1.5);
-            await stakeEnd(user2, 0, 1.5);
+            await checkStakeEnd(user1, 0, 200, 0);
+            await checkStakeEnd(user2, 0, 200, 0);
+            await stakeEnd(user1, 0, 2);
+            await stakeEnd(user2, 0, 2);
         });
     });
 
     describe("Test with 2 users staking for different times, small amounts", function() {
+        before(async function() {
+            await init();
+        });
+
         it("User 1 stakes 100 tokens for 2 years, user 2 for 1 year", async function() {
-            await stakeStart(user1, 100, 730, 93.37);
-            await stakeStart(user2, 100, 365, 80);
+            await stakeStart(user1, 100, 730, 1315);
+            await stakeStart(user2, 100, 365, 706);
         });
 
         it("Deployer funds multiple times", async function() {
@@ -222,40 +226,40 @@ const { time } = require("@openzeppelin/test-helpers");
             await checkStakeEnd(user2, 0, 0, 100);
 
             increaseDays(4);
-            await checkStakeEnd(user1, 0, 0, 121.543);
-            await checkStakeEnd(user2, 0, 0, 118.457);
+            await checkStakeEnd(user1, 0, 0, 126);
+            await checkStakeEnd(user2, 0, 0, 114);
 
             increaseDays(86);
-            await checkStakeEnd(user1, 0, 0, 584.703);
-            await checkStakeEnd(user2, 0, 0, 515.296);
+            await checkStakeEnd(user1, 0, 0, 685);
+            await checkStakeEnd(user2, 0, 0, 415);
         });
 
         it("user 2 has staked for half of the period he committed to, his stake return is now minimally the stake amount he put in", async function() {
             increaseDays(93);
-            await checkStakeEnd(user2, 0, 100, 844.437);
+            await checkStakeEnd(user2, 0, 100, 640);
         });
 
         it("user 2 stake ends, 0 penalty and unstakes", async function() {
             increaseDays(182);
-            await checkStakeEnd(user2, 0, 1784.259, 0);
-            await stakeEnd(user2, 0, 26.764);
+            await checkStakeEnd(user2, 0, 1376, 0);
+            await stakeEnd(user2, 0, 13);
         });
 
         it("user 1 has staked for half of the period he committed to", async function() {
-            await checkStakeEnd(user1, 0, 100, 1965.74);
+            await checkStakeEnd(user1, 0, 100, 2374);
         });
 
         it("user 1 now has all the reward in the pool for himself", async function() {
             increaseDays(365);
-            await checkStakeEnd(user1, 0, 5715.74, 0);
+            await checkStakeEnd(user1, 0, 6124, 0);
             increaseDays(1);
-            await checkStakeEnd(user1, 0, 5715.74, 0);
+            await checkStakeEnd(user1, 0, 6124, 0);
             increaseDays(1);
-            await checkStakeEnd(user1, 0, 5715.74, 0);
+            await checkStakeEnd(user1, 0, 6124, 0);
         });
 
         it("user 1 late fee", async function() {
-            const totalReturn = 5715.74;
+            const totalReturn = 6124;
             increaseDays(12);
             await checkStakeEnd(user1, 0, totalReturn, 0);
 
@@ -272,70 +276,89 @@ const { time } = require("@openzeppelin/test-helpers");
             await checkStakeEnd(user1, 0, 0, totalReturn);
         });
 
-        it("User 3 stakes for 10 days and ends stake for user, getting half of his total return", async function() {
+        it("User 3 stakes for 20 days and ends stake for user 1, getting half of his total return", async function() {
             increaseDays(10);
 
-            await stakeStart(user3, 100, 10, 3.755);
+            await stakeStart(user3, 100, 20, 9);
             increaseDays(1);
             await stakeGoodAccounting(user1, 0, user3);
             increaseDays(1);
-            await checkStakeEnd(user3, 0, 0, 2957.87);
+            await checkStakeEnd(user3, 0, 0, 3162);
 
-            await expect(contract.stakeGoodAccounting(user1.address, 0, 3)).to.be.revertedWith("STAKING: Stake already unlocked");
-            await expect(contract.stakeGoodAccounting(user3.address, 0, 5)).to.be.revertedWith("STAKING: Stake not fully served");
+            await expect(contract.stakeGoodAccounting(user1.address, 0, 1)).to.be.revertedWith("STAKING: Stake already unlocked");
+            await expect(contract.stakeGoodAccounting(user3.address, 0, 3)).to.be.revertedWith("STAKING: Stake not fully served");
 
-            increaseDays(10);
-            await checkStakeEnd(user3, 0, 2957.87, 0);
-            await stakeEnd(user3, 0, 791.643);
+            increaseDays(20);
+            await checkStakeEnd(user3, 0, 3162, 0);
+            await stakeEnd(user3, 0, 435);
         });
 
-        it("User 1 stakes for 200 days, unstakes after 120 days", async function() {
+        it("User 1 stakes for 100000 amount for 200 days, unstakes after 120 days", async function() {
             await fundRewards(10, 200, 0);
 
-            await stakeStart(user1, 100, 200, 0.14013);
+            await stakeStart(user1, 100000, 200, 998);
             increaseDays(120);
 
-            await checkStakeEnd(user1, 1, 289.999, 999.999);
-            await stakeEnd(user1, 1, 2295.744);
+            await checkStakeEnd(user1, 1, 100189, 1000);
+            await stakeEnd(user1, 1, 435);
         });
 
         it("User 1 unstakes the first stake with late fee", async function() {
-            await stakeEnd(user1, 0, 2295.744);
+            await stakeEnd(user1, 0, 435);
         
             expect(await stakingToken.balanceOf(contract.address)).to.closeTo(parseUnits(1310), PRECISION_LOSS);
         });
     });
 
     describe("Test share bonuses", function() {
-        it("Check max bonus for bigger amount (6.666%)", async function() {
-            const bonusShares = await contract.stakeStartBonusShares(parseUnits("100000000"), 1);
-            expect(bonusShares).to.closeTo(parseUnits("6663333.333"), PRECISION_LOSS);
+        before(async function() {
+            await init();
         });
 
-        it("Check max bonus for bigger amount (10% capped)", async function() {
-            const bonusShares = await contract.stakeStartBonusShares(parseUnits("150050000"), 1);
-            expect(bonusShares).to.equal(parseUnits("15005000"));
+        it("Check bonus for 50000 amount", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("50000"), 1);
+            expect(bonusShares).to.closeTo(parseUnits("0"), PRECISION_LOSS);
         });
 
-        it("Check max bonus for longer time", async function() {
-            let bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 5);
-            expect(bonusShares).to.closeTo(parseUnits("1.0022"), PRECISION_LOSS);
+        it("Check bonus for 100000 amount (2.5%)", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("100000"), 1);
+            expect(bonusShares).to.closeTo(parseUnits("2500"), PRECISION_LOSS);
+        });
 
-            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 10);
-            expect(bonusShares).to.closeTo(parseUnits("2"), PRECISION_LOSS);
+        it("Check max bonus for 1050000 amount (50%)", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("1050000"), 1);
+            expect(bonusShares).to.equal(parseUnits("525000"));
+        });
 
-            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 15);
-            expect(bonusShares).to.closeTo(parseUnits("2"), PRECISION_LOSS);
+        it("Check max bonus for 2000000 amount (capped 50%)", async function() {
+            const bonusShares = await contract.stakeStartBonusShares(parseUnits("2000000"), 1);
+            expect(bonusShares).to.equal(parseUnits("1000000"));
+        });
+
+        it("Check bonuses for staking longer", async function() {
+            let bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365);
+            expect(bonusShares).to.closeTo(parseUnits("6"), PRECISION_LOSS);
+
+            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 2);
+            expect(bonusShares).to.closeTo(parseUnits("12"), PRECISION_LOSS);
+
+            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 3);
+            expect(bonusShares).to.closeTo(parseUnits("18"), PRECISION_LOSS);
+
+            bonusShares = await contract.stakeStartBonusShares(parseUnits("1"), 365 * 4);
+            expect(bonusShares).to.closeTo(parseUnits("18"), PRECISION_LOSS);
         });
     });
 
     describe("Test input require statements in external functions", function () {
         before(async function() {
-            await stakeStart(user1, 100, 10, 0.04377);
+            await init();
+            await stakeStart(user1, 100, 15, 123);
         });
 
         it("Stake start inputs", async function() {
             contract = contract.connect(user1);
+            await expect(contract.stakeStart(100, 14)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
             await expect(contract.stakeStart(100, 0)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
             await expect(contract.stakeStart(0, 100)).to.be.revertedWith("STAKING: newStakedAmount must be at least minimum shareRate");
             await expect(contract.stakeStart(100, 55555)).to.be.revertedWith("STAKING: newStakedDays higher than maximum");
@@ -364,24 +387,24 @@ const { time } = require("@openzeppelin/test-helpers");
     describe("Test distributing allocated (for late unstakers) unclaimable reward", function() {
         before(async function() {
             await init(); //reset
-            await fundRewards(10, 15, 0);
+            await fundRewards(10, 20, 0);
 
-            await stakeStart(user1, 100, 10, 100.494);
+            await stakeStart(user1, 100, 15, 123);
             increaseDays(5);
-            await stakeStart(user2, 100, 10, 100.494);
-            increaseDays(6);
-            await checkStakeEnd(user1, 0, 175, 0);
+            await stakeStart(user2, 100, 15, 123);
+            increaseDays(11);
+            await checkStakeEnd(user1, 0, 200, 0);
         });
 
         it("User 1 unstakes 3 days late, his allocated unclaimable reward is added as reward for the next day", async function () {
             increaseDays(3);
-            await stakeEnd(user1, 0, 1.75);
+            await stakeEnd(user1, 0, 2);
         });
 
         it("User 2 gets the unclaimable reward by user 1", async function() {
             increaseDays(2);
-            await checkStakeEnd(user2, 0, 175, 0);
-            await stakeEnd(user2, 0, 1.75);
+            await checkStakeEnd(user2, 0, 200, 0);
+            await stakeEnd(user2, 0, 2);
         });
     });
-});*/
+});
