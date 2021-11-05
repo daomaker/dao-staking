@@ -164,39 +164,39 @@ describe("Staking smart contract", function() {
         });
 
         it("Deployer funds", async function() {
-            await fundRewards(10, 20, 0);
+            await fundRewards(10, 30, 0);
         });
     
         it("User 1 and 2 stake 100 tokens for 20 days", async function() {
-            await stakeStart(user1, 100, 20, 131);
-            await stakeStart(user2, 100, 20, 131);
+            await stakeStart(user1, 100, 30, 148);
+            await stakeStart(user2, 100, 30, 148);
+        });
+
+        it("Check hard lock", async function() {
+            contract = contract.connect(user1);
+            await expect(contract.stakeEnd(0, 1)).to.be.revertedWith("STAKING: hard lock period");
+            increaseDays(15);
+            await expect(contract.stakeEnd(0, 1)).to.be.revertedWith("STAKING: hard lock period");
         });
     
-        it("Checks multiple days for reward and penalty of users, who then unstake after 20 days", async function() {
-            await checkStakeEnd(user1, 0, 100, 0);
-            await checkStakeEnd(user2, 0, 100, 0);
-
+        it("Checks multiple days for reward and penalty of users, who then unstake after their lock periods end", async function() {
             increaseDays(1);
-            await checkStakeEnd(user1, 0, 0, 100);
-            await checkStakeEnd(user2, 0, 0, 100);
-
-            increaseDays(4);
-            await checkStakeEnd(user1, 0, 0, 120);
-            await checkStakeEnd(user2, 0, 0, 120);
+            await checkStakeEnd(user1, 0, 25, 150);
+            await checkStakeEnd(user2, 0, 25, 150);
 
             increaseDays(5);
-            await checkStakeEnd(user1, 0, 0, 145);
-            await checkStakeEnd(user2, 0, 0, 145);
+            await checkStakeEnd(user1, 0, 50, 150);
+            await checkStakeEnd(user2, 0, 50, 150);
 
-            increaseDays(1);
-            await checkStakeEnd(user1, 0, 0, 150);
-            await checkStakeEnd(user2, 0, 0, 150);
+            increaseDays(5);
+            await checkStakeEnd(user1, 0, 75, 150);
+            await checkStakeEnd(user2, 0, 75, 150);
 
-            increaseDays(10);
-            await checkStakeEnd(user1, 0, 200, 0);
-            await checkStakeEnd(user2, 0, 200, 0);
-            await stakeEnd(user1, 0, 2);
-            await stakeEnd(user2, 0, 2);
+            increaseDays(5);
+            await checkStakeEnd(user1, 0, 250, 0);
+            await checkStakeEnd(user2, 0, 250, 0);
+            await stakeEnd(user1, 0, 2.5);
+            await stakeEnd(user2, 0, 2.5);
         });
     });
 
@@ -218,18 +218,15 @@ describe("Staking smart contract", function() {
         });
 
         it("Checks early fees", async function() {
-            await checkStakeEnd(user1, 0, 100, 0);
-            await checkStakeEnd(user2, 0, 100, 0);
+            increaseDays(16);
+            await checkStakeEnd(user1, 0, 0, 197);
+            await checkStakeEnd(user2, 0, 0, 152);
 
-            increaseDays(1);
-            await checkStakeEnd(user1, 0, 0, 100);
-            await checkStakeEnd(user2, 0, 0, 100);
+            increaseDays(15);
+            await checkStakeEnd(user1, 0, 0, 295);
+            await checkStakeEnd(user2, 0, 0, 204);
 
-            increaseDays(4);
-            await checkStakeEnd(user1, 0, 0, 126);
-            await checkStakeEnd(user2, 0, 0, 114);
-
-            increaseDays(86);
+            increaseDays(60);
             await checkStakeEnd(user1, 0, 0, 685);
             await checkStakeEnd(user2, 0, 0, 415);
         });
@@ -276,19 +273,19 @@ describe("Staking smart contract", function() {
             await checkStakeEnd(user1, 0, 0, totalReturn);
         });
 
-        it("User 3 stakes for 20 days and ends stake for user 1, getting half of his total return", async function() {
+        it("User 3 stakes ends stake for user 1, getting half of his total return", async function() {
             increaseDays(10);
 
-            await stakeStart(user3, 100, 20, 9);
+            await stakeStart(user3, 100, 30, 11);
             increaseDays(1);
             await stakeGoodAccounting(user1, 0, user3);
-            increaseDays(1);
+            increaseDays(15);
             await checkStakeEnd(user3, 0, 0, 3162);
 
             await expect(contract.stakeGoodAccounting(user1.address, 0, 1)).to.be.revertedWith("STAKING: Stake already unlocked");
             await expect(contract.stakeGoodAccounting(user3.address, 0, 3)).to.be.revertedWith("STAKING: Stake not fully served");
 
-            increaseDays(20);
+            increaseDays(15);
             await checkStakeEnd(user3, 0, 3162, 0);
             await stakeEnd(user3, 0, 435);
         });
@@ -353,18 +350,20 @@ describe("Staking smart contract", function() {
     describe("Test input require statements in external functions", function () {
         before(async function() {
             await init();
-            await stakeStart(user1, 100, 15, 123);
+            await stakeStart(user1, 100, 30, 148);
         });
 
         it("Stake start inputs", async function() {
             contract = contract.connect(user1);
-            await expect(contract.stakeStart(100, 14)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
+            await expect(contract.stakeStart(100, 29)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
             await expect(contract.stakeStart(100, 0)).to.be.revertedWith("STAKING: newStakedDays lower than minimum");
             await expect(contract.stakeStart(0, 100)).to.be.revertedWith("STAKING: newStakedAmount must be at least minimum shareRate");
             await expect(contract.stakeStart(100, 55555)).to.be.revertedWith("STAKING: newStakedDays higher than maximum");
         });
 
         it("Stake end inputs", async function() {
+            await expect(contract.stakeEnd(0, 1)).to.be.revertedWith("STAKING: hard lock period");
+            increaseDays(16);
             await expect(contract.stakeEnd(0, 10)).to.be.revertedWith("STAKING: stakeIdParam not in stake");
             await expect(contract.stakeEnd(10, 10)).to.be.revertedWith("STAKING: stakeIndex invalid");
         });
@@ -386,25 +385,25 @@ describe("Staking smart contract", function() {
 
     describe("Test distributing allocated (for late unstakers) unclaimable reward", function() {
         before(async function() {
-            await init(); //reset
-            await fundRewards(10, 20, 0);
+            await init();
+            await fundRewards(10, 30, 0);
 
-            await stakeStart(user1, 100, 15, 123);
+            await stakeStart(user1, 100, 30, 148);
             increaseDays(5);
-            await stakeStart(user2, 100, 15, 123);
-            increaseDays(11);
-            await checkStakeEnd(user1, 0, 200, 0);
+            await stakeStart(user2, 100, 30, 148);
+            increaseDays(26);
+            await checkStakeEnd(user1, 0, 275, 0);
         });
 
         it("User 1 unstakes 3 days late, his allocated unclaimable reward is added as reward for the next day", async function () {
             increaseDays(3);
-            await stakeEnd(user1, 0, 2);
+            await stakeEnd(user1, 0, 2.5);
         });
 
         it("User 2 gets the unclaimable reward by user 1", async function() {
             increaseDays(2);
-            await checkStakeEnd(user2, 0, 200, 0);
-            await stakeEnd(user2, 0, 2);
+            await checkStakeEnd(user2, 0, 225, 0);
+            await stakeEnd(user2, 0, 2.5);
         });
     });
 });

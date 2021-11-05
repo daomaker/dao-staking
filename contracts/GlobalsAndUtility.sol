@@ -64,7 +64,8 @@ abstract contract GlobalsAndUtility {
     uint256 internal constant TOKEN_DECIMALS = 18;
 
     /* Stake timing parameters */
-    uint256 internal constant MIN_STAKE_DAYS = 15;
+    uint256 internal constant HARD_LOCK_DAYS = 15;
+    uint256 internal constant MIN_STAKE_DAYS = 30;
     uint256 internal constant MAX_STAKE_DAYS = 1095;
     uint256 internal constant EARLY_PENALTY_MIN_DAYS = 30;
     uint256 internal constant LATE_PENALTY_GRACE_DAYS = 14;

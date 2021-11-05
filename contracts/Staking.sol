@@ -40,6 +40,8 @@ contract Staking is GlobalsAndUtility {
 
         /* Enforce the minimum stake time */
         require(newStakedDays >= MIN_STAKE_DAYS, "STAKING: newStakedDays lower than minimum");
+        /* Enforce the maximum stake time */
+        require(newStakedDays <= MAX_STAKE_DAYS, "STAKING: newStakedDays higher than maximum");
 
         /* Check if log data needs to be updated */
         _dailyDataUpdateAuto(g);
@@ -141,30 +143,24 @@ contract Staking is GlobalsAndUtility {
         /* Check if log data needs to be updated */
         _dailyDataUpdateAuto(g);
 
-        uint256 servedDays = 0;
+        require(g._currentDay >= st._lockedDay + HARD_LOCK_DAYS, "STAKING: hard lock period");
 
+        uint256 servedDays = 0;
         bool prevUnlocked = (st._unlockedDay != 0);
 
-        if (g._currentDay >= st._lockedDay) {
-            if (prevUnlocked) {
-                /* Previously unlocked in stakeGoodAccounting(), so must have served full term */
-                servedDays = st._stakedDays;
-            } else {
-                _stakeUnlock(g, st);
-
-                servedDays = g._currentDay - st._lockedDay;
-                if (servedDays > st._stakedDays) {
-                    servedDays = st._stakedDays;
-                }
-            }
-
-            (stakeReturn, payout, penalty, cappedPenalty) = _stakePerformance(st, servedDays);
+        if (prevUnlocked) {
+            /* Previously unlocked in stakeGoodAccounting(), so must have served full term */
+            servedDays = st._stakedDays;
         } else {
-            /* Stake hasn't been added to the total yet, so no penalties or rewards apply */
-            g._nextStakeSharesTotal -= st._stakeShares;
+            _stakeUnlock(g, st);
 
-            stakeReturn = st._stakedAmount;
+            servedDays = g._currentDay - st._lockedDay;
+            if (servedDays > st._stakedDays) {
+                servedDays = st._stakedDays;
+            }
         }
+
+        (stakeReturn, payout, penalty, cappedPenalty) = _stakePerformance(st, servedDays);
 
         emit StakeEnd(
             msg.sender,
@@ -250,9 +246,6 @@ contract Staking is GlobalsAndUtility {
     )
         internal
     {
-        /* Enforce the maximum stake time */
-        require(newStakedDays <= MAX_STAKE_DAYS, "STAKING: newStakedDays higher than maximum");
-
         uint256 bonusShares = stakeStartBonusShares(newStakedAmount, newStakedDays);
         uint256 newStakeShares = (newStakedAmount + bonusShares) * SHARE_RATE_SCALE / g._shareRate;
 
