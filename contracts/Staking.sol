@@ -287,6 +287,49 @@ contract Staking is GlobalsAndUtility {
         g._lockedStakeTotal += newStakedAmount;
     }
 
+    /* 
+    Returns the same values as function stakeEnd. However, this function makes 
+    it possible to anyone view the stakeReturn etc. for any staker. 
+
+    The results can be obsolete if there are no daily updates.
+    */
+    function getStakeStatus(
+        address staker, 
+        uint256 stakeIndex, 
+        uint40 stakeIdParam
+    ) 
+        external
+        view
+        returns (uint256 stakeReturn, uint256 payout, uint256 penalty, uint256 cappedPenalty)
+    {
+        GlobalsCache memory g;
+        _globalsLoad(g);
+
+        StakeStore[] storage stakeListRef = stakeLists[staker];
+
+        require(stakeListRef.length != 0, "STAKING: Empty stake list");
+        require(stakeIndex < stakeListRef.length, "STAKING: stakeIndex invalid");
+
+        StakeCache memory st;
+        _stakeLoad(stakeListRef[stakeIndex], stakeIdParam, st);
+
+        require(g._currentDay >= st._lockedDay + HARD_LOCK_DAYS, "STAKING: hard lock period");
+
+        uint256 servedDays = 0;
+        bool prevUnlocked = (st._unlockedDay != 0);
+
+        if (prevUnlocked) {
+            servedDays = st._stakedDays;
+        } else {
+            servedDays = g._currentDay - st._lockedDay;
+            if (servedDays > st._stakedDays) {
+                servedDays = st._stakedDays;
+            }
+        }
+
+        (stakeReturn, payout, penalty, cappedPenalty) = _stakePerformance(st, servedDays);
+    }
+
     /**
      * @dev Calculates total stake payout including rewards for a multi-day range
      * @param stakeSharesParam Param from stake to calculate bonuses for

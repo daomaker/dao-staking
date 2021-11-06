@@ -406,4 +406,23 @@ describe("Staking smart contract", function() {
             await stakeEnd(user2, 0, 2.5);
         });
     });
+
+    describe("Test function getStakeStatus", function() {
+        before(async function() {
+            await init();
+            await stakeStart(user1, 100, 30, 148);
+            increaseDays(20);
+            await contract.dailyDataUpdate(currentDay);
+        });
+
+        it("getStakeStatus returns the same as the endStake function", async function() {
+            const stakeEndResult = await contract.callStatic.stakeEnd(0, 1);
+            const getStakeStatusResult = await contract.getStakeStatus(user1.address, 0, 1);
+
+            expect(stakeEndResult.stakeReturn).to.equal(getStakeStatusResult.stakeReturn);
+            expect(stakeEndResult.payout).to.equal(getStakeStatusResult.payout);
+            expect(stakeEndResult.penalty).to.equal(getStakeStatusResult.penalty);
+            expect(stakeEndResult.cappedPenalty).to.equal(getStakeStatusResult.cappedPenalty);
+        });
+    });
 });
