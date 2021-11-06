@@ -68,8 +68,8 @@ abstract contract GlobalsAndUtility {
     uint256 internal constant MIN_STAKE_DAYS = 30;
     uint256 internal constant MAX_STAKE_DAYS = 1095;
     uint256 internal constant EARLY_PENALTY_MIN_DAYS = 30;
-    uint256 internal constant LATE_PENALTY_GRACE_DAYS = 14;
-    uint256 internal constant LATE_PENALTY_SCALE_DAYS = 700;
+    uint256 internal constant LATE_PENALTY_GRACE_DAYS = 30;
+    uint256 internal constant LATE_PENALTY_SCALE_DAYS = 100;
 
     /* Stake shares Longer Pays Better bonus constants used by _stakeStartBonusShares() */
     uint256 private constant LPB_BONUS_PERCENT = 600;

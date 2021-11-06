@@ -257,17 +257,17 @@ describe("Staking smart contract", function() {
 
         it("user 1 late fee", async function() {
             const totalReturn = 6124;
-            increaseDays(12);
+            increaseDays(28);
             await checkStakeEnd(user1, 0, totalReturn, 0);
 
             // late fee start
-            increaseDays(350);
+            increaseDays(50);
             await checkStakeEnd(user1, 0, totalReturn / 2, totalReturn / 2);
 
             await contract.dailyDataUpdate(currentDay);
 
-            increaseDays(349);
-            await checkStakeEnd(user1, 0, totalReturn / 700, totalReturn / 700 * 699);
+            increaseDays(49);
+            await checkStakeEnd(user1, 0, totalReturn / 100, totalReturn / 100 * 99);
 
             increaseDays(1);
             await checkStakeEnd(user1, 0, 0, totalReturn);
