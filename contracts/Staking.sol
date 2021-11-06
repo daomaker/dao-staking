@@ -285,6 +285,9 @@ contract Staking is GlobalsAndUtility {
 
         /* Track total staked amount for inflation calculations */
         g._lockedStakeTotal += newStakedAmount;
+
+        /* Remove his share from the pool when his stake ends */
+        dailyData[newLockedDay + newStakedDays].sharesToBeRemoved += uint128(newStakeShares);
     }
 
     /* 
@@ -430,20 +433,14 @@ contract Staking is GlobalsAndUtility {
 
     function _stakeUnlock(GlobalsCache memory g, StakeCache memory st)
         private
-        view
     {
-        g._stakeSharesTotal -= st._stakeShares;
         st._unlockedDay = g._currentDay;
 
-        /* 
-        Users' shares aren't removed at (s._lockedDay + s._stakedDays) day from g.stakeSharesTotal.
-        Therefore, reward is allocated for them even though they can't claim it.
-        That's why the allocated unclaimable reward is added as reward for the next day to be distributed to the other stakers.
-        */
         uint256 endDay = st._lockedDay + st._stakedDays;
-        if (g._currentDay > endDay) {
-            uint256 allocatedUnclaimableReward = _calcPayoutRewards(st._stakeShares, endDay, g._currentDay);
-            g._stakePenaltyTotal += allocatedUnclaimableReward;
+        
+        if (g._currentDay <= endDay) {
+            dailyData[endDay].sharesToBeRemoved -= uint128(st._stakeShares);
+            g._stakeSharesTotal -= st._stakeShares;
         }
     }
 
@@ -501,13 +498,6 @@ contract Staking is GlobalsAndUtility {
         uint256 penaltyDays = (stakedDaysParam + 1) / 2;
         if (penaltyDays < EARLY_PENALTY_MIN_DAYS) {
             penaltyDays = EARLY_PENALTY_MIN_DAYS;
-        }
-
-        if (servedDays == 0) {
-            /* Fill penalty days with the estimated average payout */
-            uint256 expected = _estimatePayoutRewardsDay(stakeSharesParam, lockedDayParam);
-            penalty = expected * penaltyDays;
-            return (payout, penalty); // Actual payout was 0
         }
 
         if (penaltyDays < servedDays) {

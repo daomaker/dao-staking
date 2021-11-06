@@ -123,6 +123,7 @@ abstract contract GlobalsAndUtility {
     struct DailyDataStore {
         uint128 dayPayoutTotal;
         uint128 dayStakeSharesTotal;
+        uint128 sharesToBeRemoved;
         uint256 accRewardPerShare;
     }
 
@@ -345,32 +346,6 @@ abstract contract GlobalsAndUtility {
         stakeListRef.pop();
     }
 
-    /**
-     * @dev Estimate the stake payout for an incomplete day
-     * @param stakeSharesParam Param from stake to calculate bonuses for
-     * @return payout
-     */
-    function _estimatePayoutRewardsDay(uint256 stakeSharesParam, uint256 day)
-        internal
-        view
-        returns (uint256 payout)
-    {
-        /* Prevent updating state for this estimation */
-        GlobalsCache memory g2;
-        _globalsLoad(g2);
-
-        DailyRoundState memory rs;
-
-        _dailyRoundCalc(g2, rs, day);
-
-        /* Stake is no longer locked so it must be added to total as if it were */
-        g2._stakeSharesTotal += stakeSharesParam;
-
-        payout = rs._payoutTotal * stakeSharesParam / g2._stakeSharesTotal;
-
-        return payout;
-    }
-
     function _dailyRoundCalc(GlobalsCache memory g, DailyRoundState memory rs, uint256 day)
         private
         view
@@ -391,6 +366,8 @@ abstract contract GlobalsAndUtility {
     function _dailyRoundCalcAndStore(GlobalsCache memory g, DailyRoundState memory rs, uint256 day)
         private
     {
+        g._stakeSharesTotal -= dailyData[day].sharesToBeRemoved;
+
         _dailyRoundCalc(g, rs, day);
 
         dailyData[day].accRewardPerShare = rs._accRewardPerShare;
