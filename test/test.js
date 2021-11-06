@@ -386,7 +386,7 @@ describe("Staking smart contract", function() {
     describe("Test distributing allocated (for late unstakers) unclaimable reward", function() {
         before(async function() {
             await init();
-            await fundRewards(10, 30, 0);
+            await fundRewards(10, 35, 0);
 
             await stakeStart(user1, 100, 30, 148);
             increaseDays(5);
@@ -402,7 +402,7 @@ describe("Staking smart contract", function() {
 
         it("User 2 gets the unclaimable reward by user 1", async function() {
             increaseDays(2);
-            await checkStakeEnd(user2, 0, 225, 0);
+            await checkStakeEnd(user2, 0, 275, 0);
             await stakeEnd(user2, 0, 2.5);
         });
     });
