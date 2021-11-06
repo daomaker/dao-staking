@@ -11,3 +11,4 @@ Fork of HEX https://etherscan.io/address/0x2b591e99afe9f32eaa6214f7b7629768c40ee
 - distributing allocated unclaimable reward of late unstakers
 - bonus for staking more amount starts from BPB_FROM_AMOUNT instead of 0
 - changed staking constants
+- added hard lock
