@@ -122,7 +122,6 @@ abstract contract GlobalsAndUtility {
     /* Daily data */
     struct DailyDataStore {
         uint128 dayPayoutTotal;
-        uint128 dayStakeSharesTotal;
         uint128 sharesToBeRemoved;
         uint256 accRewardPerShare;
     }
@@ -184,22 +183,22 @@ abstract contract GlobalsAndUtility {
      * a single call. Ugly implementation due to limitations of the standard ABI encoder.
      * @param beginDay First day of data range
      * @param endDay Last day (non-inclusive) of data range
-     * @return listDayStakeSharesTotal and listDayPayoutTotal
+     * @return listDayAccRewardPerShare and listDayPayoutTotal
      */
     function dailyDataRange(uint256 beginDay, uint256 endDay)
         external
         view
-        returns (uint256[] memory listDayStakeSharesTotal, uint256[] memory listDayPayoutTotal)
+        returns (uint256[] memory listDayAccRewardPerShare, uint256[] memory listDayPayoutTotal)
     {
         require(beginDay < endDay, "STAKING: range invalid");
 
-        listDayStakeSharesTotal = new uint256[](endDay - beginDay);
+        listDayAccRewardPerShare = new uint256[](endDay - beginDay);
         listDayPayoutTotal = new uint256[](endDay - beginDay);
 
         uint256 src = beginDay;
         uint256 dst = 0;
         do {
-            listDayStakeSharesTotal[dst] = dailyData[src].dayStakeSharesTotal;
+            listDayAccRewardPerShare[dst] = dailyData[src].accRewardPerShare;
             listDayPayoutTotal[dst++] = dailyData[src].dayPayoutTotal;
         } while (++src < endDay);
     }
@@ -373,7 +372,6 @@ abstract contract GlobalsAndUtility {
         dailyData[day].accRewardPerShare = rs._accRewardPerShare;
 
         if (g._stakeSharesTotal > 0) {
-            dailyData[day].dayStakeSharesTotal = uint128(g._stakeSharesTotal);
             dailyData[day].dayPayoutTotal = uint128(rs._payoutTotal);
         } else {
             // nobody staking that day, move the reward to the next day if any
