@@ -56,9 +56,9 @@ abstract contract GlobalsAndUtility {
         uint16 shiftInDays
     );
 
-    IERC20Burnable stakingToken;
-    uint40 launchTime;
-    address originAddr;
+    IERC20Burnable public stakingToken;
+    uint40 public launchTime;
+    address public originAddr;
 
     uint256 internal constant ACC_REWARD_MULTIPLIER = 1e36;
     uint256 internal constant TOKEN_DECIMALS = 18;

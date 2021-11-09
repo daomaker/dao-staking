@@ -324,6 +324,8 @@ contract Staking is GlobalsAndUtility {
         if (prevUnlocked) {
             servedDays = st._stakedDays;
         } else {
+            st._unlockedDay = g._currentDay;
+
             servedDays = g._currentDay - st._lockedDay;
             if (servedDays > st._stakedDays) {
                 servedDays = st._stakedDays;
