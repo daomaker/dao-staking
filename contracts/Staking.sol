@@ -366,55 +366,6 @@ contract Staking is GlobalsAndUtility {
         pure
         returns (uint256 bonusShares)
     {
-        /*
-            LONGER PAYS BETTER:
-
-            If longer than 1 day stake is committed to, each extra day
-            gives bonus shares of approximately 0.0548%, which is approximately 20%
-            extra per year of increased stake length committed to, but capped to a
-            maximum of 200% extra.
-
-            extraDays       =  stakedDays - 1
-
-            longerBonus%    = (extraDays / 364) * 20%
-                            = (extraDays / 364) / 5
-                            =  extraDays / 1820
-                            =  extraDays / LPB
-
-            extraDays       =  longerBonus% * 1820
-            extraDaysMax    =  longerBonusMax% * 1820
-                            =  200% * 1820
-                            =  3640
-                            =  LPB_MAX_DAYS
-
-            BIGGER PAYS BETTER:
-
-            Bonus percentage scaled 0% to 10% for the first 150M of stake.
-
-            biggerBonus%    = (cappedStake /  BPB_MAX) * 10%
-                            = (cappedStake /  BPB_MAX) / 10
-                            =  cappedStake / (BPB_MAX * 10)
-                            =  cappedStake /  BPB
-
-            COMBINED:
-
-            combinedBonus%  =            longerBonus%  +  biggerBonus%
-
-                                      cappedExtraDays     cappedStake
-                            =         ---------------  +  ------------
-                                            LPB               BPB
-
-                                cappedExtraDays * BPB     cappedStake * LPB
-                            =   ---------------------  +  ------------------
-                                      LPB * BPB               LPB * BPB
-
-                                cappedExtraDays * BPB  +  cappedStake * LPB
-                            =   --------------------------------------------
-                                                  LPB  *  BPB
-
-            bonusShares     = stake * combinedBonus%
-                            = stake * (cappedExtraDays * BPB  +  cappedStake * LPB) / (LPB * BPB)
-        */
         uint256 cappedExtraDays = 0;
 
         /* Must be more than 1 day for Longer-Pays-Better */
