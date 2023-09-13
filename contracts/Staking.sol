@@ -145,7 +145,7 @@ contract Staking is GlobalsAndUtility {
 
         require(g._currentDay >= st._lockedDay + HARD_LOCK_DAYS, "STAKING: hard lock period");
 
-        uint256 servedDays = 0;
+        uint256 servedDays;
         bool prevUnlocked = (st._unlockedDay != 0);
 
         if (prevUnlocked) {
@@ -318,7 +318,7 @@ contract Staking is GlobalsAndUtility {
 
         require(g._currentDay >= st._lockedDay + HARD_LOCK_DAYS, "STAKING: hard lock period");
 
-        uint256 servedDays = 0;
+        uint256 servedDays;
         bool prevUnlocked = (st._unlockedDay != 0);
 
         if (prevUnlocked) {
@@ -366,7 +366,7 @@ contract Staking is GlobalsAndUtility {
         pure
         returns (uint256 bonusShares)
     {
-        uint256 cappedExtraDays = 0;
+        uint256 cappedExtraDays;
 
         /* Must be more than 1 day for Longer-Pays-Better */
         if (newStakedDays > 1) {
