@@ -64,7 +64,7 @@ abstract contract GlobalsAndUtility {
     uint256 internal constant TOKEN_DECIMALS = 18;
 
     /* Stake timing parameters */
-    uint256 internal constant HARD_LOCK_DAYS = 15;
+    uint256 internal constant HARD_LOCK_DAYS = 14;
     uint256 internal constant MIN_STAKE_DAYS = 30;
     uint256 internal constant MAX_STAKE_DAYS = 1095;
     uint256 internal constant EARLY_PENALTY_MIN_DAYS = 30;
@@ -235,7 +235,7 @@ abstract contract GlobalsAndUtility {
         view
         returns (uint256)
     {
-        return (block.timestamp - launchTime) / 1 days;
+        return (block.timestamp - launchTime) / 1 minutes;
     }
 
     function _dailyDataUpdateAuto(GlobalsCache memory g)

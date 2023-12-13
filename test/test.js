@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { time } = require("@openzeppelin/test-helpers");
 
 describe("Staking smart contract", function() {
-    let deployer, user1, user2, user3, contract, stakingToken, launchTime, currentDay;
+    let deployer, user1, user2, user3, contract, stakingToken, launchTime, currentDay, viewContract;
 
     const PRECISION_LOSS = "1000000000000000000";
 
@@ -158,6 +158,9 @@ describe("Staking smart contract", function() {
         stakingToken.approve(contract.address, amount);
         stakingToken = stakingToken.connect(user3);
         stakingToken.approve(contract.address, amount);
+
+        const StakingView = await ethers.getContractFactory("StakingView");
+        contractView = await StakingView.deploy();
     }
 
     describe("Simple test with 2 users staking the same (small) amount for the same time", function() {

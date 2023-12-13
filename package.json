@@ -22,6 +22,7 @@
     "hardhat-gas-reporter": "^1.0.4"
   },
   "dependencies": {
+    "@nomiclabs/hardhat-etherscan": "^2.1.7",
     "@openzeppelin/contracts": "^4.3.2",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0"

@@ -1,6 +1,6 @@
 async function main() {
-    const stakingToken = "0x141fe79c2a797fd5ad703fc3752bdbc66afb52aa";
-    const launchTime = 1636411860;
+    const stakingToken = "0xF1007A2cdff2A3EBc6FAad1F86F9ce1d30593927";
+    const launchTime = 1650362100;
     const originAddr = "0xcF28556EE95Be8c52AD2f3480149128cCA51daC1";
 
     const Staking = await ethers.getContractFactory("Staking");
